@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+  COORDENADOR
+}
+
+enum ProjectStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(STUDENT)
+  courseId  String?
+  course    Course?  @relation(fields: [courseId], references: [id])
+  
+  projects  ProjectMember[]
+  likes     Like[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+model Course {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  users       User[]
+  projects    Project[]
+}
+
+model Project {
+  id               String         @id @default(uuid())
+  title            String
+  shortDescription String
+  description      String         @db.Text
+  thumbnailUrl     String?
+  status           ProjectStatus  @default(PENDING_REVIEW)
+  isFeatured       Boolean        @default(false)
+  viewsCount       Int            @default(0)
+  
+  courseId         String
+  course           Course         @relation(fields: [courseId], references: [id])
+  
+  members          ProjectMember[]
+  likes            Like[]
+  
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([status, isFeatured])
+  @@index([courseId])
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  roleInfo  String?
+  
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+}
+
+model Like {
+  userId    String
+  projectId String
+  
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+}
