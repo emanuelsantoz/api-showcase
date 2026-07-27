@@ -35,9 +35,7 @@ export class ProjectService {
     };
   }
 
-  async createProject(data: any, ownerId: string) {
-    const allMembers = Array.from(new Set([ownerId, ...data.membersIds]));
-    
+  async createProject(data: any) {
     return await prisma.project.create({
       data: {
         title: data.title,
@@ -47,9 +45,9 @@ export class ProjectService {
         courseId: data.courseId,
         status: ProjectStatus.PENDING_REVIEW,
         members: {
-          create: allMembers.map((userId) => ({
+          create: data.membersIds.map((userId: string) => ({
             userId,
-            roleInfo: userId === ownerId ? 'Leader' : 'Contributor',
+            roleInfo: 'Contributor',
           })),
         },
       },
@@ -64,18 +62,23 @@ export class ProjectService {
     });
   }
 
-  async toggleLike(projectId: string, userId: string) {
-    const existingLike = await prisma.like.findUnique({
-      where: { userId_projectId: { userId, projectId } },
+  async toggleLike(projectId: string) {
+    // Sem autenticação, apenas incrementa like (contador simples)
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { likesCount: true },
     });
 
-    if (existingLike) {
-      await prisma.like.delete({ where: { userId_projectId: { userId, projectId } } });
-      return { liked: false };
+    if (!project) {
+      throw new Error('Project not found');
     }
 
-    await prisma.like.create({ data: { userId, projectId } });
-    return { liked: true };
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { likesCount: { increment: 1 } },
+    });
+
+    return { liked: true, likesCount: project.likesCount + 1 };
   }
 
   async updateStatus(id: string, status: ProjectStatus, isFeatured?: boolean) {

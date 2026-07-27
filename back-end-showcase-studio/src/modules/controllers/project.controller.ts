@@ -21,9 +21,8 @@ export class ProjectController {
 
   async create(c: Context) {
     const body = await c.req.json();
-    const user = c.get('jwtPayload') as { id: string };
 
-    const project = await projectService.createProject(body, user.id);
+    const project = await projectService.createProject(body);
     return c.json({ message: 'Submissão efetuada com sucesso.', project }, 201);
   }
 
@@ -35,9 +34,8 @@ export class ProjectController {
 
   async handleLike(c: Context) {
     const { id } = c.req.param();
-    const user = c.get('jwtPayload') as { id: string };
 
-    const result = await projectService.toggleLike(id, user.id);
+    const result = await projectService.toggleLike(id);
     return c.json(result, 200);
   }
 
