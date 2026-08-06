@@ -19,9 +19,14 @@ class ProjectController {
     }
     async create(c) {
         const body = await c.req.json();
-        const user = c.get('jwtPayload');
-        const project = await projectService.createProject(body, user.id);
+        const project = await projectService.createProject(body);
         return c.json({ message: 'Submissão efetuada com sucesso.', project }, 201);
+    }
+    async getById(c) {
+        const project = await projectService.getProject(c.req.param('id'));
+        if (!project)
+            return c.json({ error: 'Not Found', message: 'Project not found.' }, 404);
+        return c.json({ data: project }, 200);
     }
     async incrementViews(c) {
         const { id } = c.req.param();
@@ -30,7 +35,7 @@ class ProjectController {
     }
     async handleLike(c) {
         const { id } = c.req.param();
-        const user = c.get('jwtPayload');
+        const user = c.get('user');
         const result = await projectService.toggleLike(id, user.id);
         return c.json(result, 200);
     }

@@ -26,6 +26,12 @@ export class ProjectController {
     return c.json({ message: 'Submissão efetuada com sucesso.', project }, 201);
   }
 
+  async getById(c: Context) {
+    const project = await projectService.getProject(c.req.param('id')!);
+    if (!project) return c.json({ error: 'Not Found', message: 'Project not found.' }, 404);
+    return c.json({ data: project }, 200);
+  }
+
   async incrementViews(c: Context) {
     const { id } = c.req.param();
     const result = await projectService.incrementViews(id);
@@ -35,7 +41,8 @@ export class ProjectController {
   async handleLike(c: Context) {
     const { id } = c.req.param();
 
-    const result = await projectService.toggleLike(id);
+    const user = c.get('user') as { id: string };
+    const result = await projectService.toggleLike(id, user.id);
     return c.json(result, 200);
   }
 

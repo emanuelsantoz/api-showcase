@@ -4,6 +4,8 @@ const hono_1 = require("hono");
 const cors_1 = require("hono/cors");
 const logger_1 = require("hono/logger");
 const routes_1 = require("./modules/routes");
+const courses_routes_1 = require("./modules/courses.routes");
+const auth_routes_1 = require("./modules/auth.routes");
 const env_1 = require("./config/env");
 const app = new hono_1.Hono().basePath('/api/v1');
 // Middlewares de Segurança
@@ -33,5 +35,7 @@ app.onError((err, c) => {
 });
 // Acoplamento de Módulos
 app.route('/projects', routes_1.projectRoutes);
+app.route('/courses', courses_routes_1.courseRoutes);
+app.route('/auth', auth_routes_1.authRoutes);
 exports.default = app;
 //# sourceMappingURL=app.js.map
