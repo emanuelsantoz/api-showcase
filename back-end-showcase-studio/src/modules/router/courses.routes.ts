@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { prisma } from '../db/prisma';
+import { prisma } from '../../db/prisma';
 
 export const courseRoutes = new Hono();
 

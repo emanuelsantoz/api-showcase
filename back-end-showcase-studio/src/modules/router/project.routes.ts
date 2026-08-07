@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { ProjectController } from './controllers/project.controller';
-import { createProjectSchema, queryProjectSchema, updateProjectStatusSchema } from './schemas/project.schema';
-import { requireAuth, requireModerator } from './auth';
+import { ProjectController } from '../controllers/project.controller';
+import { createProjectSchema, queryProjectSchema, updateProjectStatusSchema } from '../schemas/project.schema';
+import { requireAuth, requireModerator } from '../auth';
 
 const router = new Hono();
 const controller = new ProjectController();
@@ -16,7 +16,8 @@ router.get('/', zValidator('query', queryProjectSchema, (result, c) => {
 router.get('/:id', controller.getById);
 router.patch('/:id/view', controller.incrementViews);
 
-// Rotas de Projeto (criação, like, moderação)
+// Rotas de Projeto (criação, like, moderação) 
+// Refatorar para caso queira dar like -> ter autenticação
 router.post('/', requireAuth, zValidator('json', createProjectSchema), controller.create);
 router.post('/:id/like', requireAuth, controller.handleLike);
 router.patch('/:id/status', requireAuth, requireModerator, zValidator('json', updateProjectStatusSchema), controller.moderate);

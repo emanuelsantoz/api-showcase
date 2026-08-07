@@ -3,8 +3,8 @@ import { zValidator } from '@hono/zod-validator';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { env } from '../config/env';
-import { prisma } from '../db/prisma';
+import { env } from '../../config/env';
+import { prisma } from '../../db/prisma';
 
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
 export const authRoutes = new Hono();

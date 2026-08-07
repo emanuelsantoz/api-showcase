@@ -28,8 +28,12 @@ export class ProjectService {
   async createProject(data: { title: string; shortDescription: string; description: string; thumbnailUrl?: string; courseId: string; membersIds: string[] }) {
     return prisma.project.create({
       data: {
-        title: data.title, shortDescription: data.shortDescription, description: data.description,
-        thumbnailUrl: data.thumbnailUrl, courseId: data.courseId, status: ProjectStatus.PENDING_REVIEW,
+        title: data.title,
+        shortDescription: data.shortDescription,
+        description: data.description,
+        thumbnailUrl: data.thumbnailUrl,
+        courseId: data.courseId,
+        status: ProjectStatus.PENDING_REVIEW,
         members: { create: data.membersIds.map((userId) => ({ userId, roleInfo: 'Contributor' })) },
       },
     });
