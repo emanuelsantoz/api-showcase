@@ -52,6 +52,15 @@ model User {
   email           String          @unique
   password        String
   role            Role            @default(STUDENT)
+  phone           String?
+  jobTitle        String?
+  department      String?
+  location        String?
+  bio             String?         @db.Text
+  avatarUrl       String?
+  notifySubmissions Boolean       @default(true)
+  notifyWeeklySummary Boolean     @default(true)
+  notifySearchTrends Boolean      @default(false)
   courseId        String?
   course          Course?         @relation(fields: [courseId], references: [id])
   projects        ProjectMember[]

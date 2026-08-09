@@ -2,8 +2,20 @@ import { Hono } from 'hono';
 import { SemesterStatus } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 import { requireAuth, requireModerator } from '../auth';
+import { z } from 'zod';
 
 export const courseRoutes = new Hono();
+
+const createCourseSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  description: z.string().trim().max(500).optional().or(z.literal('')),
+});
+
+courseRoutes.post('/', requireAuth, requireModerator, async (c) => {
+  const body = createCourseSchema.parse(await c.req.json());
+  const course = await prisma.course.create({ data: { name: body.name, description: body.description || null } });
+  return c.json({ data: course, message: 'Curso cadastrado.' }, 201);
+});
 
 courseRoutes.get('/admin', requireAuth, requireModerator, async (c) => {
   const courses = await prisma.course.findMany({ orderBy: { name: 'asc' } });

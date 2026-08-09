@@ -9,6 +9,7 @@ import { publicSubmissionRoutes } from './modules/router/public-submission.route
 import { moderationRoutes } from './modules/router/moderation.routes';
 import { semesterRoutes } from './modules/router/semester.routes';
 import { userRoutes } from './modules/router/users.routes';
+import { dashboardRoutes } from './modules/router/dashboard.routes';
 import { env } from './config/env';
 import { NoOpenSemesterError, SemesterCourseConfigurationError } from './modules/services/semester.service';
 
@@ -49,5 +50,6 @@ app.route('/public/submissions', publicSubmissionRoutes);
 app.route('/moderation', moderationRoutes);
 app.route('/semesters', semesterRoutes);
 app.route('/users', userRoutes);
+app.route('/dashboard', dashboardRoutes);
 
 export default app;
