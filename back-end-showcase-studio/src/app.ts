@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { Prisma } from '@prisma/client';
+import { z } from 'zod';
 import { projectRoutes } from './modules/router/project.routes';
 import { courseRoutes } from './modules/router/courses.routes';
 import { authRoutes } from './modules/router/auth.routes';
@@ -33,6 +34,7 @@ app.use('*', cors({
 app.onError((err, c) => {
   console.error(`[Error Handler]: ${err.message}`);
   if (err instanceof NoOpenSemesterError) return c.json({ error: 'Conflict', message: err.message }, 409);
+  if (err instanceof z.ZodError) return c.json({ error: 'Bad Request', message: 'Dados de submissão inválidos.', details: err.issues }, 400);
   if (err instanceof SemesterCourseConfigurationError) return c.json({ error: 'Unprocessable Entity', message: err.message }, 422);
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2025') return c.json({ error: 'Not Found', message: 'Resource not found.' }, 404);
