@@ -9,6 +9,7 @@ export class ProjectController {
     const query = c.req.query();
     const result = await projectService.listProjects({
       courseId: query.courseId,
+      semesterId: query.semesterId,
       isFeatured: query.isFeatured ? query.isFeatured === 'true' : undefined,
       page: parseInt(query.page || '1', 10),
       limit: parseInt(query.limit || '12', 10),
@@ -41,7 +42,7 @@ export class ProjectController {
   }
 
   async moderate(c: Context) {
-    const body = await c.req.json<{ status: 'APPROVED' | 'REJECTED' | 'PENDING_REVIEW' | 'DRAFT'; isFeatured?: boolean }>();
+    const body = await c.req.json<{ status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'PENDING_REVIEW' | 'DRAFT'; isFeatured?: boolean }>();
     const updated = await projectService.updateStatus(c.req.param('id')!, body.status, body.isFeatured);
     return c.json({ message: 'Status de moderação atualizado.', updated }, 200);
   }

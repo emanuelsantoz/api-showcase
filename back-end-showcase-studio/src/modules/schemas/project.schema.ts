@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+const externalUrl = z.string().url().refine((value) => ['http:', 'https:'].includes(new URL(value).protocol), 'Use uma URL HTTP ou HTTPS.');
+
 export const createProjectSchema = z.object({
   title: z.string().min(5).max(100),
   shortDescription: z.string().min(10).max(255),
@@ -7,6 +9,10 @@ export const createProjectSchema = z.object({
   thumbnailUrl: z.string().url().optional(),
   courseId: z.string().uuid(),
   membersIds: z.array(z.string().uuid()).min(1),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
+  liveUrl: externalUrl.optional(),
+  prototypeUrl: externalUrl.optional(),
+  repositoryUrl: externalUrl.optional(),
   presentation: z.object({
     type: z.literal('CANVA'),
     url: z.string().url(),
@@ -18,12 +24,14 @@ export const canvaPresentationSchema = z.object({
 });
 
 export const updateProjectStatusSchema = z.object({
-  status: z.enum(['APPROVED', 'REJECTED', 'PENDING_REVIEW', 'DRAFT']),
+  status: z.enum(['APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'PENDING_REVIEW', 'DRAFT']),
   isFeatured: z.boolean().optional(),
 });
 
 export const queryProjectSchema = z.object({
   courseId: z.string().optional(),
+  // IDs históricos da migration podem ser hashes estáveis; novos semestres usam UUID.
+  semesterId: z.string().min(1).optional(),
   isFeatured: z.string().optional(),
   page: z.string().optional().default('1'),
   limit: z.string().optional().default('12'),

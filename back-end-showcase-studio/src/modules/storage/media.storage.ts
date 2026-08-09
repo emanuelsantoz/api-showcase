@@ -15,6 +15,14 @@ export type StoredMedia = {
   provider: StorageProvider;
 };
 
+export type MediaKind = 'THUMBNAIL' | 'PRESENTATION_PDF' | 'CANVA';
+
+export function resolveStorageProvider(kind: MediaKind): StorageProvider {
+  if (kind === 'THUMBNAIL') return 'CLOUDFLARE_R2' as StorageProvider;
+  if (kind === 'PRESENTATION_PDF') return 'VERCEL_BLOB' as StorageProvider;
+  return 'CANVA' as StorageProvider;
+}
+
 function r2Config() {
   if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_BUCKET_NAME || !env.R2_PUBLIC_URL) {
     throw new Error('Cloudflare R2 environment variables are not configured.');

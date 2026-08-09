@@ -1,0 +1,37 @@
+import { z } from 'zod';
+
+const externalUrl = z.string().url().refine((value) => ['http:', 'https:'].includes(new URL(value).protocol), 'Use uma URL HTTP ou HTTPS.');
+const tagsSchema = z.array(z.string().trim().min(1).max(40)).max(20).default([]);
+const contributorSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  email: z.string().email().optional().or(z.literal('')),
+  roleInfo: z.string().trim().max(80).optional(),
+});
+
+export const publicSubmissionSchema = z.object({
+  title: z.string().min(5).max(100),
+  shortDescription: z.string().min(10).max(255),
+  description: z.string().min(20),
+  courseId: z.string().uuid(),
+  submitterName: z.string().min(2).max(120),
+  submitterEmail: z.string().email(),
+  membersIds: z.array(z.string().uuid()).default([]),
+  contributors: z.array(contributorSchema).max(20).default([]),
+  tags: tagsSchema,
+  liveUrl: externalUrl.optional(),
+  prototypeUrl: externalUrl.optional(),
+  repositoryUrl: externalUrl.optional(),
+  presentationType: z.enum(['PDF', 'CANVA']),
+  canvaUrl: z.string().url().optional(),
+});
+
+export const publicResubmissionSchema = publicSubmissionSchema.omit({
+  courseId: true,
+  submitterName: true,
+  submitterEmail: true,
+  membersIds: true,
+});
+
+export const reviewReasonSchema = z.object({
+  reason: z.string().min(5).max(2000),
+});

@@ -1,107 +1,136 @@
 # Diagrama de classes do banco de dados
 
-Fonte de verdade: `prisma/schema.prisma` e migrations em `prisma/migrations`.
-
 ```mermaid
 classDiagram
   direction LR
-
-  class Role {
-    <<enumeration>>
-    STUDENT
-    ADMIN
-    COORDENADOR
-  }
 
   class ProjectStatus {
     <<enumeration>>
     DRAFT
     PENDING_REVIEW
+    CHANGES_REQUESTED
     APPROVED
     REJECTED
+  }
+
+  class PresentationType {
+    <<enumeration>>
+    CANVA
+    PDF
+  }
+
+  class StorageProvider {
+    <<enumeration>>
+    CANVA
+    VERCEL_BLOB
+    CLOUDFLARE_R2
+  }
+
+  class ReviewDecision {
+    <<enumeration>>
+    APPROVED
+    CHANGES_REQUESTED
+    REJECTED
+  }
+
+  class SemesterStatus {
+    <<enumeration>>
+    DRAFT
+    OPEN
+    CLOSED
+    ARCHIVED
   }
 
   class User {
     +String id PK
     +String name
     +String email UK
-    +String password
     +Role role
-    +String? courseId FK
-    +DateTime createdAt
-    +DateTime updatedAt
-  }
-
-  class Course {
-    +String id PK
-    +String name UK
-    +String? description
   }
 
   class Project {
     +String id PK
     +String title
-    +String shortDescription
-    +Text description
-    +String? thumbnailUrl
+    +String? submitterName
+    +String? submitterEmail
+    +Int revision
+    +String semesterId FK
+    +String[] tags
+    +String? liveUrl
+    +String? prototypeUrl
+    +String? repositoryUrl
     +ProjectStatus status
-    +Boolean isFeatured
-    +Int viewsCount
-    +Int likesCount
-    +String courseId FK
-    +DateTime createdAt
-    +DateTime updatedAt
+    +String? thumbnailUrl
+    +StorageProvider? thumbnailStorageProvider
+    +String? thumbnailStorageKey
   }
 
-  class ProjectMember {
-    +String projectId PK, FK
-    +String userId PK, FK
-    +String? roleInfo
-  }
-  
   class Semester {
-    +String SemesterId PK, FK
-    +String projectId PK, FK
-    +String courseId PK, FK
-    +DateTime startSemestre
-    +DateTime endSemestre
+    +String id PK
+    +Int year
+    +Int number
+    +String code UK
+    +String label
+    +String? theme
+    +DateTime startsAt
+    +DateTime endsAt
+    +SemesterStatus status
   }
 
   class ProjectPresentation {
-    +String projectPresentation PK, FK
-    +String projectId PK, FK
-    +String? roleInfo
-    +Enum type(CANVA | PDF | IMAGES)
+    +String id PK
+    +String projectId UK, FK
+    +PresentationType type
     +String url
-    +Enum storageProvider(CANVA | VERCEL_BLOB | CLOUDFLARE_R2)
-    +String storageKey - identificador do arquivo, se aplicável
-    +String contentType - application/pdf, image/webp etc.
-    +Int sizeBytes
+    +StorageProvider storageProvider
+    +String? storageKey
+  }
+
+  class ProjectContributor {
+    +String id PK
+    +String projectId FK
+    +String name
+    +String? email
+    +String? roleInfo
+  }
+
+  class ProjectReview {
+    +String id PK
+    +String projectId FK
+    +String reviewerId FK
+    +ReviewDecision decision
+    +String? reason
     +DateTime createdAt
   }
 
-  class Like {
-    +String userId PK, FK
-    +String projectId PK, FK
+  class ProjectAccessToken {
+    +String id PK
+    +String projectId FK
+    +String tokenHash UK
+    +DateTime expiresAt
+    +DateTime? usedAt
   }
 
-  Role <.. User : role
+  User "1" <-- "0..*" ProjectReview : reviewer
+  Project "1" *-- "0..1" ProjectPresentation : presentation
+  Project "1" *-- "0..*" ProjectContributor : public contributors
+  Project "1" *-- "0..*" ProjectReview : reviews
+  Project "1" *-- "0..*" ProjectAccessToken : edit tokens
+  Semester "1" --> "0..*" Project : contains
   ProjectStatus <.. Project : status
-  Course "0..1" <-- "0..*" User : course
-  Course "1" <-- "0..*" Project : course
-  User "1" <-- "0..*" ProjectMember : user
-  Project "1" <-- "0..*" ProjectMember : project
-  User "1" <-- "0..*" Like : user
-  Project "1" <-- "0..*" Like : project
-  ProjectPresentation "1" <-- "1..*" Project: ProjectPresentation>
-  Semester "1" <-- "1..1" Project: Semester>
-  Semester "2" <-- "*..*" Course: Semester>
+  PresentationType <.. ProjectPresentation : type
+  StorageProvider <.. Project : thumbnail provider
+  StorageProvider <.. ProjectPresentation : file provider
+  ReviewDecision <.. ProjectReview : decision
+  SemesterStatus <.. Semester : status
 ```
 
-## Regras de integridade
+## Regras do fluxo
 
-- `User.email` e `Course.name` são únicos.
-- `ProjectMember` e `Like` usam chaves primárias compostas (`projectId` + `userId`).
-- A remoção de um `User` ou `Project` remove seus respectivos `ProjectMember` e `Like` associados em cascata.
-- A remoção de um `Course` não remove projetos: um projeto sempre exige um curso.
-- A remoção de um curso desvincula os usuários associados (`courseId` passa a ser nulo).
+- O estudante não precisa de conta para criar uma submissão.
+- O professor precisa estar autenticado para avaliar.
+- `CHANGES_REQUESTED` significa que o estudante pode corrigir e reenviar.
+- O token de correção é salvo somente como hash e expira em 72 horas.
+- Ao reenviar, o token anterior é invalidado.
+- A aprovação ou rejeição definitiva invalida tokens pendentes.
+- O arquivo físico fica no provider indicado em `storageProvider`; o Neon guarda apenas URL e metadados.

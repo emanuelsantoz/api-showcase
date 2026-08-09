@@ -225,6 +225,37 @@ const response = await fetch(`${apiUrl}/projects`, {
 })
 ```
 
+## Submissão pública sem login
+
+```http
+POST /api/v1/public/submissions
+Content-Type: multipart/form-data
+```
+
+A requisição recebe `title`, `shortDescription`, `description`, `courseId`, `submitterName`, `submitterEmail`, `membersIds`, `contributors`, `tags`, `liveUrl`, `prototypeUrl`, `repositoryUrl`, `thumbnail`, `presentationType` e `presentation` (PDF) ou `canvaUrl`.
+
+Para corrigir uma submissão após solicitação do professor:
+
+```http
+POST /api/v1/public/submissions/UUID_DO_PROJETO/resubmit
+Authorization: Bearer TOKEN_TEMPORARIO
+Content-Type: multipart/form-data
+```
+
+## Moderação do professor
+
+Todas as rotas exigem JWT de `ADMIN` ou `COORDENADOR`:
+
+```text
+GET   /api/v1/moderation/projects
+GET   /api/v1/moderation/projects/:id
+PATCH /api/v1/moderation/projects/:id/approve
+PATCH /api/v1/moderation/projects/:id/request-changes
+PATCH /api/v1/moderation/projects/:id/reject
+```
+
+`request-changes` recebe `{ "reason": "..." }` e gera um link temporário de correção.
+
 ## Respostas de erro
 
 | Código | Significado |
@@ -236,3 +267,37 @@ const response = await fetch(`${apiUrl}/projects`, {
 | `409` | Registro duplicado. |
 | `422` | Relação com recurso inexistente, por exemplo um curso inválido. |
 | `500` | Erro inesperado no servidor. |
+
+## Semestres e tema atual
+
+O estudante nÃ£o envia o semestre. A API associa automaticamente a submissÃ£o ao Ãºnico semestre com status `OPEN`.
+
+```text
+GET   /api/v1/semesters
+GET   /api/v1/semesters/current
+POST  /api/v1/semesters                 # ADMIN ou COORDENADOR
+PATCH /api/v1/semesters/:id/open        # ADMIN ou COORDENADOR
+PATCH /api/v1/semesters/:id/close       # ADMIN ou COORDENADOR
+PATCH /api/v1/semesters/:id/theme       # ADMIN ou COORDENADOR
+GET   /api/v1/projects?semesterId=UUID
+```
+
+Uma submissÃ£o sem semestre aberto retorna `409`. O tema fica salvo no semestre e Ã© retornado na listagem para exibiÃ§Ã£o no front-end.
+
+## Links, tags e integrantes pÃºblicos
+
+As submissÃµes podem enviar `liveUrl`, `prototypeUrl`, `repositoryUrl` e `tags` como JSON. Integrantes sem conta sÃ£o enviados em `contributors`:
+
+```json
+{
+  "contributors": [
+    { "name": "Ana Silva", "email": "ana@example.com", "roleInfo": "Front-end" }
+  ],
+  "tags": ["React", "IoT"],
+  "liveUrl": "https://exemplo.vercel.app",
+  "prototypeUrl": "https://www.figma.com/design/...",
+  "repositoryUrl": "https://github.com/org/projeto"
+}
+```
+
+Esses campos sÃ£o opcionais e aparecem no portfÃ³lio apenas quando preenchidos.

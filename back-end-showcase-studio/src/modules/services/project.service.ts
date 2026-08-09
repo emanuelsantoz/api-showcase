@@ -1,12 +1,14 @@
 import { prisma } from '../../db/prisma';
 import { ProjectStatus, StorageProvider } from '@prisma/client';
-import { env } from '../../config/env';
-import { deleteMedia, uploadMedia, type UploadableMedia } from '../storage/media.storage';
+import { deleteMedia, resolveStorageProvider, uploadMedia, type UploadableMedia } from '../storage/media.storage';
+import { NoOpenSemesterError, SemesterService } from './semester.service';
 
 const details = {
   course: true,
+  semester: true,
   presentation: true,
   members: { include: { user: { select: { id: true, name: true } } } },
+  contributors: true,
   _count: { select: { likes: true } },
 } as const;
 
@@ -18,14 +20,21 @@ type ProjectInput = {
   courseId: string;
   membersIds: string[];
   presentation?: { type: 'CANVA'; url: string };
+  tags?: string[];
+  liveUrl?: string;
+  prototypeUrl?: string;
+  repositoryUrl?: string;
   createdById: string;
 };
 
 export class ProjectService {
-  async listProjects(filters: { courseId?: string; isFeatured?: boolean; page: number; limit: number }) {
+  private readonly semesters = new SemesterService();
+
+  async listProjects(filters: { courseId?: string; semesterId?: string; isFeatured?: boolean; page: number; limit: number }) {
     const skip = (filters.page - 1) * filters.limit;
-    const where: { status: ProjectStatus; courseId?: string; isFeatured?: boolean } = { status: ProjectStatus.APPROVED };
+    const where: { status: ProjectStatus; courseId?: string; semesterId?: string; isFeatured?: boolean } = { status: ProjectStatus.APPROVED };
     if (filters.courseId) where.courseId = filters.courseId;
+    if (filters.semesterId) where.semesterId = filters.semesterId;
     if (filters.isFeatured !== undefined) where.isFeatured = filters.isFeatured;
 
     const [projects, total] = await prisma.$transaction([
@@ -40,6 +49,8 @@ export class ProjectService {
   }
 
   async createProject(data: ProjectInput) {
+    const semester = await this.semesters.getCurrent();
+    if (!semester) throw new NoOpenSemesterError();
     return prisma.project.create({
       data: {
         title: data.title,
@@ -47,6 +58,11 @@ export class ProjectService {
         description: data.description,
         thumbnailUrl: data.thumbnailUrl,
         courseId: data.courseId,
+        semesterId: semester.id,
+        tags: data.tags ?? [],
+        liveUrl: data.liveUrl,
+        prototypeUrl: data.prototypeUrl,
+        repositoryUrl: data.repositoryUrl,
         createdById: data.createdById,
         status: ProjectStatus.PENDING_REVIEW,
         members: { create: data.membersIds.map((userId) => ({ userId, roleInfo: 'Contributor' })) },
@@ -101,9 +117,7 @@ export class ProjectService {
 
   async uploadThumbnail(id: string, file: UploadableMedia) {
     const previous = await prisma.project.findUnique({ where: { id }, select: { thumbnailStorageProvider: true, thumbnailStorageKey: true, thumbnailUrl: true } });
-    const provider = env.MEDIA_STORAGE_PROVIDER === 'CLOUDFLARE_R2'
-      ? StorageProvider.CLOUDFLARE_R2
-      : StorageProvider.VERCEL_BLOB;
+    const provider = resolveStorageProvider('THUMBNAIL');
     const stored = await uploadMedia(`projects/${id}/thumbnail`, file, provider);
     const updated = await prisma.project.update({
       where: { id },
@@ -118,7 +132,7 @@ export class ProjectService {
 
   async uploadPdf(id: string, file: UploadableMedia) {
     const previous = await prisma.projectPresentation.findUnique({ where: { projectId: id } });
-    const stored = await uploadMedia(`projects/${id}/presentation.pdf`, file, StorageProvider.CLOUDFLARE_R2);
+    const stored = await uploadMedia(`projects/${id}/presentation.pdf`, file, resolveStorageProvider('PRESENTATION_PDF'));
     const presentation = await prisma.projectPresentation.upsert({
       where: { projectId: id },
       create: { projectId: id, type: 'PDF', url: stored.url, storageProvider: stored.provider, storageKey: stored.key, contentType: file.type, sizeBytes: file.size },
