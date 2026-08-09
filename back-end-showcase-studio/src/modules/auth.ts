@@ -23,3 +23,9 @@ export const requireModerator: MiddlewareHandler = async (c, next) => {
   if (!user || !['ADMIN', 'COORDENADOR'].includes(user.role)) return c.json({ error: 'Forbidden', message: 'Moderator role is required.' }, 403);
   await next();
 };
+
+export const requireAdmin: MiddlewareHandler = async (c, next) => {
+  const user = c.get('user') as AuthUser | undefined;
+  if (!user || user.role !== 'ADMIN') return c.json({ error: 'Forbidden', message: 'Administrator role is required.' }, 403);
+  await next();
+};

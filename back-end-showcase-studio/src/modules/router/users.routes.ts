@@ -3,7 +3,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { Role } from '@prisma/client';
 import { prisma } from '../../db/prisma';
-import { requireAuth, requireModerator } from '../auth';
+import { requireAuth, requireAdmin } from '../auth';
 
 const userRoutes = new Hono();
 const createProfessorSchema = z.object({
@@ -12,7 +12,7 @@ const createProfessorSchema = z.object({
   password: z.string().min(8).max(120),
 });
 
-userRoutes.use('*', requireAuth, requireModerator);
+userRoutes.use('*', requireAuth, requireAdmin);
 
 userRoutes.get('/professors', async (c) => {
   const users = await prisma.user.findMany({

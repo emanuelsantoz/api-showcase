@@ -16,7 +16,13 @@ async function main() {
     throw new Error('Para zerar o banco, defina SEED_RESET_CONFIRMATION=RESET.');
   }
 
-  const passwordHash = await bcrypt.hash('123456_temporial', 12);
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'emanuelsantossouzajesus@gmail.com';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (!adminPassword) {
+    throw new Error('Defina SEED_ADMIN_PASSWORD com a senha do administrador antes de executar o seed.');
+  }
+  const adminPasswordHash = await bcrypt.hash(adminPassword, 12);
+  const professorPasswordHash = await bcrypt.hash('123456_temporial', 12);
 
   await prisma.$transaction(async (tx) => {
     await tx.like.deleteMany();
@@ -33,15 +39,25 @@ async function main() {
 
     await tx.user.create({
       data: {
+        name: 'Administrador da Plataforma',
+        email: adminEmail.toLowerCase(),
+        password: adminPasswordHash,
+        role: Role.ADMIN,
+      },
+    });
+
+    await tx.user.create({
+      data: {
         name: 'Professor de Teste',
         email: 'professor_teste@gmail.com',
-        password: passwordHash,
+        password: professorPasswordHash,
         role: Role.COORDENADOR,
       },
     });
   });
 
   console.log('Banco resetado com sucesso.');
+  console.log(`Administrador criado: ${adminEmail}`);
   console.log('Professor criado: professor_teste@gmail.com');
   console.log('Senha temporária: 123456_temporial');
 }
