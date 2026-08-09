@@ -279,6 +279,9 @@ POST  /api/v1/semesters                 # ADMIN ou COORDENADOR
 PATCH /api/v1/semesters/:id/open        # ADMIN ou COORDENADOR
 PATCH /api/v1/semesters/:id/close       # ADMIN ou COORDENADOR
 PATCH /api/v1/semesters/:id/theme       # ADMIN ou COORDENADOR
+PATCH /api/v1/semesters/:id/courses     # ADMIN ou COORDENADOR; body: { "courseIds": ["UUID"] }
+GET   /api/v1/courses                   # somente disciplinas do semestre OPEN
+GET   /api/v1/courses/admin             # ADMIN ou COORDENADOR; todas as disciplinas
 GET   /api/v1/projects?semesterId=UUID
 ```
 

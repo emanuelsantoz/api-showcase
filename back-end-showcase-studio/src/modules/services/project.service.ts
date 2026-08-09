@@ -51,6 +51,7 @@ export class ProjectService {
   async createProject(data: ProjectInput) {
     const semester = await this.semesters.getCurrent();
     if (!semester) throw new NoOpenSemesterError();
+    await this.semesters.assertCourseAcceptsProjects(semester.id, data.courseId);
     return prisma.project.create({
       data: {
         title: data.title,

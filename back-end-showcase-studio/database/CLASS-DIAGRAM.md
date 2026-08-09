@@ -77,6 +77,17 @@ classDiagram
     +SemesterStatus status
   }
 
+  class Course {
+    +String id PK
+    +String name UK
+    +String? description
+  }
+
+  class SemesterCourse {
+    +String semesterId PK, FK
+    +String courseId PK, FK
+  }
+
   class ProjectPresentation {
     +String id PK
     +String projectId UK, FK
@@ -117,6 +128,9 @@ classDiagram
   Project "1" *-- "0..*" ProjectReview : reviews
   Project "1" *-- "0..*" ProjectAccessToken : edit tokens
   Semester "1" --> "0..*" Project : contains
+  Semester "1" *-- "0..*" SemesterCourse : enabled disciplines
+  Course "1" *-- "0..*" SemesterCourse : offered in
+  Course "1" --> "0..*" Project : categorizes
   ProjectStatus <.. Project : status
   PresentationType <.. ProjectPresentation : type
   StorageProvider <.. Project : thumbnail provider

@@ -157,6 +157,14 @@ async function main() {
     semesters.set(code, semester.id);
   }
 
+  const semesterCourses = [...new Map(
+    mockProjects.map((project) => [
+      `${project.semesterCode}:${project.category}`,
+      { semesterId: semesters.get(project.semesterCode)!, courseId: courses.get(project.category)! },
+    ]),
+  ).values()];
+  await prisma.semesterCourse.createMany({ data: semesterCourses, skipDuplicates: true });
+
   for (const project of mockProjects) {
     const courseId = courses.get(project.category)!;
     const semesterId = semesters.get(project.semesterCode)!;

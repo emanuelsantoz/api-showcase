@@ -12,6 +12,7 @@ const createSchema = z.object({
 }).refine((value) => value.endsAt > value.startsAt, { message: 'endsAt deve ser posterior a startsAt.' });
 
 const themeSchema = z.object({ theme: z.string().max(255) });
+const coursesSchema = z.object({ courseIds: z.array(z.string().uuid()).max(100) });
 
 export class SemesterController {
   async list(c: Context) {
@@ -41,5 +42,10 @@ export class SemesterController {
   async updateTheme(c: Context) {
     const body = themeSchema.parse(await c.req.json());
     return c.json({ data: await service.updateTheme(c.req.param('id')!, body.theme), message: 'Tema atualizado.' }, 200);
+  }
+
+  async setCourses(c: Context) {
+    const body = coursesSchema.parse(await c.req.json());
+    return c.json({ data: await service.setCourses(c.req.param('id')!, body.courseIds), message: 'Disciplinas habilitadas para este semestre.' }, 200);
   }
 }
