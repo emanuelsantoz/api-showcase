@@ -99,6 +99,8 @@ Guarde o token apenas no cliente e nunca o envie para o repositório.
 | --- | --- | --- | --- |
 | `GET` | `/healthz` | Não | Verifica a disponibilidade da API. |
 | `POST` | `/auth/login` | Não | Realiza login e retorna um JWT. |
+| `GET` | `/users/professors` | JWT + moderador | Lista professores cadastrados. |
+| `POST` | `/users/professors` | JWT + moderador | Cria um professor com senha temporária. |
 | `GET` | `/courses` | Não | Lista os cursos. |
 | `GET` | `/projects` | Não | Lista projetos aprovados com paginação. |
 | `GET` | `/projects/:id` | Não | Busca um projeto aprovado. |
