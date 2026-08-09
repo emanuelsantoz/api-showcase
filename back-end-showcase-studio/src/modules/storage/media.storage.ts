@@ -15,10 +15,10 @@ export type StoredMedia = {
   provider: StorageProvider;
 };
 
-export type MediaKind = 'THUMBNAIL' | 'PRESENTATION_PDF' | 'CANVA';
+export type MediaKind = 'THUMBNAIL' | 'PRESENTATION_PDF' | 'CONTRIBUTOR_AVATAR' | 'CANVA';
 
 export function resolveStorageProvider(kind: MediaKind): StorageProvider {
-  if (kind === 'THUMBNAIL') return 'CLOUDFLARE_R2' as StorageProvider;
+  if (kind === 'THUMBNAIL' || kind === 'CONTRIBUTOR_AVATAR') return 'CLOUDFLARE_R2' as StorageProvider;
   if (kind === 'PRESENTATION_PDF') return 'VERCEL_BLOB' as StorageProvider;
   return 'CANVA' as StorageProvider;
 }

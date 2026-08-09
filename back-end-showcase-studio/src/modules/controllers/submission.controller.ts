@@ -47,10 +47,17 @@ export class SubmissionController {
 
 async function parseSubmissionBody(body: Record<string, unknown>): Promise<PublicSubmissionInput> {
   const metadata = parseMetadata(body, true);
+  const contributors = metadata.contributors.map((contributor, index) => ({
+    ...contributor,
+    avatarFile: getOptionalFile(body[`contributorAvatar_${index}`]),
+  }));
+  contributors.forEach(({ avatarFile }) => { if (avatarFile) validateAvatar(avatarFile); });
+  const submitterAvatarFile = getOptionalFile(body.submitterAvatar);
+  if (submitterAvatarFile) validateAvatar(submitterAvatarFile);
   const thumbnail = getFile(body.thumbnail);
   validateThumbnail(thumbnail);
   const presentation = parsePresentation(body);
-  return { ...metadata, thumbnail, presentation };
+  return { ...metadata, contributors, submitterAvatarFile, thumbnail, presentation };
 }
 
 async function parseResubmissionBody(body: Record<string, unknown>): Promise<Omit<PublicSubmissionInput, 'courseId' | 'className' | 'membersIds' | 'submitterName' | 'submitterEmail'>> {
@@ -122,9 +129,19 @@ function getFile(value: unknown) {
   return value as UploadableMedia;
 }
 
+function getOptionalFile(value: unknown) {
+  if (!value || typeof value === 'string' || Array.isArray(value) || typeof (value as { arrayBuffer?: unknown }).arrayBuffer !== 'function') return undefined;
+  return value as UploadableMedia;
+}
+
 function validateThumbnail(file: UploadableMedia) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('A thumbnail deve ser JPEG, PNG ou WEBP.');
   if (file.size > 2 * 1024 * 1024) throw new Error('A thumbnail deve ter no máximo 2 MB.');
+}
+
+function validateAvatar(file: UploadableMedia) {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('A foto do integrante deve ser JPEG, PNG ou WEBP.');
+  if (file.size > 2 * 1024 * 1024) throw new Error('A foto do integrante deve ter no mÃ¡ximo 2 MB.');
 }
 
 function parseJson(value: string, fallback: unknown) {

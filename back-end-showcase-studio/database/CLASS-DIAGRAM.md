@@ -117,6 +117,8 @@ classDiagram
     +String name
     +String? email
     +String? roleInfo
+    +String? avatarUrl
+    +String? avatarColor
   }
 
   class ProjectReview {

@@ -97,6 +97,8 @@ model Project {
   description              String               @db.Text
   submitterName            String?
   submitterEmail           String?
+  submitterAvatarUrl       String?
+  submitterAvatarColor     String?
   revision                 Int                  @default(1)
   thumbnailUrl             String?
   thumbnailStorageProvider StorageProvider?
@@ -230,6 +232,8 @@ model ProjectContributor {
   name      String
   email     String?
   roleInfo  String?
+  avatarUrl String?
+  avatarColor String?
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])

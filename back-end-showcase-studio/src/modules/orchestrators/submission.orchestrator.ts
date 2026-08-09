@@ -21,9 +21,11 @@ export type PublicSubmissionInput = {
   courseId: string;
   className: string;
   membersIds: string[];
-  contributors: Array<{ name: string; email?: string; roleInfo?: string }>;
+  contributors: Array<{ name: string; email?: string; roleInfo?: string; avatarIndex?: number; avatarColor?: string; avatarFile?: UploadableMedia; avatarUrl?: string }>;
   submitterName: string;
   submitterEmail: string;
+  submitterAvatarColor?: string;
+  submitterAvatarFile?: UploadableMedia;
   tags: string[];
   liveUrl?: string;
   prototypeUrl?: string;
@@ -45,6 +47,8 @@ export class SubmissionOrchestrator {
   async submit(input: PublicSubmissionInput) {
     let thumbnail: { provider: StorageProvider; key: string; url: string } | null = null;
     let presentation: { provider: StorageProvider; key: string; url: string; contentType?: string; sizeBytes?: number } | null = null;
+    const contributorAvatars: Array<{ provider: StorageProvider; key: string }> = [];
+    let submitterAvatar: { provider: StorageProvider; key: string; url: string } | null = null;
     const projectId = crypto.randomUUID();
     const semester = await this.semesters.getCurrent();
     if (!semester) throw new NoOpenSemesterError();
@@ -67,6 +71,17 @@ export class SubmissionOrchestrator {
         presentation = { ...pdfStored, contentType: input.presentation.file.type, sizeBytes: input.presentation.file.size };
       }
 
+      for (const [index, contributor] of input.contributors.entries()) {
+        if (!contributor.avatarFile) continue;
+        const avatar = await uploadMedia(`projects/${projectId}/contributors/${index}`, contributor.avatarFile, resolveStorageProvider('CONTRIBUTOR_AVATAR'));
+        contributorAvatars.push(avatar);
+        contributor.avatarFile = undefined;
+        (contributor as { avatarUrl?: string }).avatarUrl = avatar.url;
+      }
+      if (input.submitterAvatarFile) {
+        submitterAvatar = await uploadMedia(`projects/${projectId}/submitter-avatar`, input.submitterAvatarFile, resolveStorageProvider('CONTRIBUTOR_AVATAR'));
+      }
+
       const project = await prisma.project.create({
         data: {
           id: projectId,
@@ -78,6 +93,8 @@ export class SubmissionOrchestrator {
           semesterId: semester.id,
           submitterName: input.submitterName,
           submitterEmail: input.submitterEmail,
+          submitterAvatarUrl: submitterAvatar?.url,
+          submitterAvatarColor: input.submitterAvatarColor,
           status: ProjectStatus.PENDING_REVIEW,
           tags: input.tags,
           liveUrl: input.liveUrl,
@@ -87,7 +104,7 @@ export class SubmissionOrchestrator {
           thumbnailStorageProvider: thumbnail.provider,
           thumbnailStorageKey: thumbnail.key,
           ...(input.membersIds.length > 0 ? { members: { create: input.membersIds.map((userId) => ({ userId, roleInfo: 'Contributor' })) } } : {}),
-          ...(input.contributors.length > 0 ? { contributors: { create: input.contributors } } : {}),
+          ...(input.contributors.length > 0 ? { contributors: { create: input.contributors.map(({ name, email, roleInfo, avatarUrl, avatarColor }) => ({ name, email, roleInfo, avatarUrl, avatarColor })) } } : {}),
           ...(input.presentation.type === 'CANVA'
             ? { presentation: { create: { type: 'CANVA', url: input.presentation.url, storageProvider: 'CANVA' } } }
             : { presentation: { create: { type: 'PDF', url: presentation!.url, storageProvider: presentation!.provider, storageKey: presentation!.key, contentType: presentation!.contentType, sizeBytes: presentation!.sizeBytes } } }),
@@ -99,6 +116,8 @@ export class SubmissionOrchestrator {
     } catch (error) {
       if (presentation) await deleteMedia(presentation.provider, presentation.key).catch(() => undefined);
       if (thumbnail) await deleteMedia(thumbnail.provider, thumbnail.key).catch(() => undefined);
+      await Promise.all(contributorAvatars.map((avatar) => deleteMedia(avatar.provider, avatar.key).catch(() => undefined)));
+      if (submitterAvatar) await deleteMedia(submitterAvatar.provider, submitterAvatar.key).catch(() => undefined);
       if (projectId) await prisma.project.delete({ where: { id: projectId } }).catch(() => undefined);
       throw error;
     }
@@ -142,7 +161,7 @@ export class SubmissionOrchestrator {
       });
       await tx.projectContributor.deleteMany({ where: { projectId } });
       if (input.contributors.length > 0) {
-        await tx.projectContributor.createMany({ data: input.contributors.map((contributor) => ({ projectId, ...contributor })) });
+        await tx.projectContributor.createMany({ data: input.contributors.map(({ name, email, roleInfo, avatarUrl, avatarColor }) => ({ projectId, name, email, roleInfo, avatarUrl, avatarColor })) });
       }
       await tx.projectPresentation.upsert({
         where: { projectId },

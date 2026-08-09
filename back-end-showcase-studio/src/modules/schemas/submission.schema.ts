@@ -6,6 +6,8 @@ const contributorSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().email().optional().or(z.literal('')),
   roleInfo: z.string().trim().max(80).optional(),
+  avatarIndex: z.number().int().min(0).optional(),
+  avatarColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 });
 
 export const publicSubmissionSchema = z.object({
@@ -16,6 +18,7 @@ export const publicSubmissionSchema = z.object({
   className: z.string().trim().min(1).max(80),
   submitterName: z.string().min(2).max(120),
   submitterEmail: z.string().email(),
+  submitterAvatarColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   membersIds: z.array(z.string().uuid()).default([]),
   contributors: z.array(contributorSchema).max(20).default([]),
   tags: tagsSchema,
