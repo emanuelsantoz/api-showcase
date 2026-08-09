@@ -1,11 +1,25 @@
 import { prisma } from '../../db/prisma';
-import { ProjectStatus } from '@prisma/client';
+import { ProjectStatus, StorageProvider } from '@prisma/client';
+import { env } from '../../config/env';
+import { deleteMedia, uploadMedia, type UploadableMedia } from '../storage/media.storage';
 
 const details = {
   course: true,
+  presentation: true,
   members: { include: { user: { select: { id: true, name: true } } } },
   _count: { select: { likes: true } },
 } as const;
+
+type ProjectInput = {
+  title: string;
+  shortDescription: string;
+  description: string;
+  thumbnailUrl?: string;
+  courseId: string;
+  membersIds: string[];
+  presentation?: { type: 'CANVA'; url: string };
+  createdById: string;
+};
 
 export class ProjectService {
   async listProjects(filters: { courseId?: string; isFeatured?: boolean; page: number; limit: number }) {
@@ -25,7 +39,7 @@ export class ProjectService {
     return prisma.project.findFirst({ where: { id, status: ProjectStatus.APPROVED }, include: details });
   }
 
-  async createProject(data: { title: string; shortDescription: string; description: string; thumbnailUrl?: string; courseId: string; membersIds: string[] }) {
+  async createProject(data: ProjectInput) {
     return prisma.project.create({
       data: {
         title: data.title,
@@ -33,9 +47,16 @@ export class ProjectService {
         description: data.description,
         thumbnailUrl: data.thumbnailUrl,
         courseId: data.courseId,
+        createdById: data.createdById,
         status: ProjectStatus.PENDING_REVIEW,
         members: { create: data.membersIds.map((userId) => ({ userId, roleInfo: 'Contributor' })) },
+        ...(data.presentation ? {
+          presentation: {
+            create: { type: 'CANVA', url: data.presentation.url, storageProvider: 'CANVA' },
+          },
+        } : {}),
       },
+      include: details,
     });
   }
 
@@ -61,6 +82,57 @@ export class ProjectService {
   }
 
   async updateStatus(id: string, status: ProjectStatus, isFeatured?: boolean) {
-    return prisma.project.update({ where: { id }, data: { status, ...(isFeatured !== undefined && { isFeatured }) } });
+    return prisma.project.update({ where: { id }, data: { status, ...(isFeatured !== undefined && { isFeatured }) }, include: details });
+  }
+
+  async canManageProject(id: string, userId: string, role: string) {
+    const project = await prisma.project.findUnique({ where: { id }, select: { createdById: true } });
+    if (!project) return false;
+    return role === 'ADMIN' || role === 'COORDENADOR' || project.createdById === userId;
+  }
+
+  async setCanvaPresentation(id: string, url: string) {
+    return prisma.projectPresentation.upsert({
+      where: { projectId: id },
+      create: { projectId: id, type: 'CANVA', url, storageProvider: 'CANVA' },
+      update: { type: 'CANVA', url, storageProvider: 'CANVA', storageKey: null, contentType: null, sizeBytes: null },
+    });
+  }
+
+  async uploadThumbnail(id: string, file: UploadableMedia) {
+    const previous = await prisma.project.findUnique({ where: { id }, select: { thumbnailStorageProvider: true, thumbnailStorageKey: true, thumbnailUrl: true } });
+    const provider = env.MEDIA_STORAGE_PROVIDER === 'CLOUDFLARE_R2'
+      ? StorageProvider.CLOUDFLARE_R2
+      : StorageProvider.VERCEL_BLOB;
+    const stored = await uploadMedia(`projects/${id}/thumbnail`, file, provider);
+    const updated = await prisma.project.update({
+      where: { id },
+      data: { thumbnailUrl: stored.url, thumbnailStorageProvider: stored.provider, thumbnailStorageKey: stored.key },
+      include: details,
+    });
+    if (previous?.thumbnailStorageProvider && previous.thumbnailStorageKey) {
+      await deleteMedia(previous.thumbnailStorageProvider, previous.thumbnailStorageKey || previous.thumbnailUrl);
+    }
+    return updated;
+  }
+
+  async uploadPdf(id: string, file: UploadableMedia) {
+    const previous = await prisma.projectPresentation.findUnique({ where: { projectId: id } });
+    const stored = await uploadMedia(`projects/${id}/presentation.pdf`, file, StorageProvider.CLOUDFLARE_R2);
+    const presentation = await prisma.projectPresentation.upsert({
+      where: { projectId: id },
+      create: { projectId: id, type: 'PDF', url: stored.url, storageProvider: stored.provider, storageKey: stored.key, contentType: file.type, sizeBytes: file.size },
+      update: { type: 'PDF', url: stored.url, storageProvider: stored.provider, storageKey: stored.key, contentType: file.type, sizeBytes: file.size },
+    });
+    if (previous?.storageProvider && previous.storageKey) await deleteMedia(previous.storageProvider, previous.storageKey);
+    return presentation;
+  }
+
+  async deletePresentation(id: string) {
+    const previous = await prisma.projectPresentation.findUnique({ where: { projectId: id } });
+    if (!previous) return null;
+    await prisma.projectPresentation.delete({ where: { projectId: id } });
+    await deleteMedia(previous.storageProvider, previous.storageKey || previous.url);
+    return previous;
   }
 }

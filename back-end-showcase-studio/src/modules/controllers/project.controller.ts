@@ -1,29 +1,26 @@
 import { Context } from 'hono';
 import { ProjectService } from '../services/project.service';
+import type { UploadableMedia } from '../storage/media.storage';
 
 const projectService = new ProjectService();
 
 export class ProjectController {
   async getAll(c: Context) {
     const query = c.req.query();
-    const page = parseInt(query.page || '1', 10);
-    const limit = parseInt(query.limit || '12', 10);
-    const isFeatured = query.isFeatured ? query.isFeatured === 'true' : undefined;
-
     const result = await projectService.listProjects({
       courseId: query.courseId,
-      isFeatured,
-      page,
-      limit,
+      isFeatured: query.isFeatured ? query.isFeatured === 'true' : undefined,
+      page: parseInt(query.page || '1', 10),
+      limit: parseInt(query.limit || '12', 10),
     });
     return c.json(result, 200);
   }
 
   async create(c: Context) {
     const body = await c.req.json();
-
-    const project = await projectService.createProject(body);
-    return c.json({ message: 'Submissão efetuada com sucesso.', project }, 201);
+    const user = c.get('user') as { id: string };
+    const project = await projectService.createProject({ ...body, createdById: user.id });
+    return c.json({ data: project, message: 'Submissão efetuada com sucesso.', project }, 201);
   }
 
   async getById(c: Context) {
@@ -33,24 +30,61 @@ export class ProjectController {
   }
 
   async incrementViews(c: Context) {
-    const { id } = c.req.param();
-    const result = await projectService.incrementViews(id);
+    const result = await projectService.incrementViews(c.req.param('id')!);
     return c.json(result, 200);
   }
 
   async handleLike(c: Context) {
-    const { id } = c.req.param();
-
     const user = c.get('user') as { id: string };
-    const result = await projectService.toggleLike(id, user.id);
+    const result = await projectService.toggleLike(c.req.param('id')!, user.id);
     return c.json(result, 200);
   }
 
   async moderate(c: Context) {
-    const { id } = c.req.param();
-    const body = await c.req.json();
-
-    const updated = await projectService.updateStatus(id, body.status, body.isFeatured);
+    const body = await c.req.json<{ status: 'APPROVED' | 'REJECTED' | 'PENDING_REVIEW' | 'DRAFT'; isFeatured?: boolean }>();
+    const updated = await projectService.updateStatus(c.req.param('id')!, body.status, body.isFeatured);
     return c.json({ message: 'Status de moderação atualizado.', updated }, 200);
+  }
+
+  private async canManage(c: Context) {
+    const user = c.get('user') as { id: string; role: string };
+    return projectService.canManageProject(c.req.param('id')!, user.id, user.role);
+  }
+
+  async setCanvaPresentation(c: Context) {
+    if (!(await this.canManage(c))) return c.json({ error: 'Forbidden', message: 'You cannot edit this project media.' }, 403);
+    const body = await c.req.json<{ url: string }>();
+    const presentation = await projectService.setCanvaPresentation(c.req.param('id')!, body.url);
+    return c.json({ data: presentation }, 200);
+  }
+
+  async uploadThumbnail(c: Context) {
+    if (!(await this.canManage(c))) return c.json({ error: 'Forbidden', message: 'You cannot edit this project media.' }, 403);
+    const body = await c.req.parseBody();
+    const file = body.file as unknown;
+    if (!file || typeof file === 'string' || Array.isArray(file) || typeof (file as { arrayBuffer?: unknown }).arrayBuffer !== 'function') return c.json({ error: 'Bad Request', message: 'A thumbnail file is required.' }, 400);
+    const mediaFile = file as UploadableMedia;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(mediaFile.type)) return c.json({ error: 'Unprocessable Entity', message: 'Thumbnail must be JPEG, PNG or WebP.' }, 422);
+    if (mediaFile.size > 2 * 1024 * 1024) return c.json({ error: 'Unprocessable Entity', message: 'Thumbnail must be smaller than 2 MB.' }, 422);
+    const project = await projectService.uploadThumbnail(c.req.param('id')!, mediaFile);
+    return c.json({ data: project }, 200);
+  }
+
+  async uploadPdf(c: Context) {
+    if (!(await this.canManage(c))) return c.json({ error: 'Forbidden', message: 'You cannot edit this project media.' }, 403);
+    const body = await c.req.parseBody();
+    const file = body.file as unknown;
+    if (!file || typeof file === 'string' || Array.isArray(file) || typeof (file as { arrayBuffer?: unknown }).arrayBuffer !== 'function') return c.json({ error: 'Bad Request', message: 'A PDF file is required.' }, 400);
+    const mediaFile = file as UploadableMedia;
+    if (mediaFile.type !== 'application/pdf') return c.json({ error: 'Unprocessable Entity', message: 'Presentation must be a PDF.' }, 422);
+    if (mediaFile.size > 10 * 1024 * 1024) return c.json({ error: 'Unprocessable Entity', message: 'PDF must be smaller than 10 MB.' }, 422);
+    const presentation = await projectService.uploadPdf(c.req.param('id')!, mediaFile);
+    return c.json({ data: presentation }, 200);
+  }
+
+  async deletePresentation(c: Context) {
+    if (!(await this.canManage(c))) return c.json({ error: 'Forbidden', message: 'You cannot edit this project media.' }, 403);
+    await projectService.deletePresentation(c.req.param('id')!);
+    return c.body(null, 204);
   }
 }

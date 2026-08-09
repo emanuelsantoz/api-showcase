@@ -7,6 +7,14 @@ export const createProjectSchema = z.object({
   thumbnailUrl: z.string().url().optional(),
   courseId: z.string().uuid(),
   membersIds: z.array(z.string().uuid()).min(1),
+  presentation: z.object({
+    type: z.literal('CANVA'),
+    url: z.string().url(),
+  }).optional(),
+});
+
+export const canvaPresentationSchema = z.object({
+  url: z.string().url().refine((url) => /canva\.com\/design\/.+\/view/i.test(url), 'URL pública do Canva inválida.'),
 });
 
 export const updateProjectStatusSchema = z.object({
