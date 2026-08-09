@@ -23,5 +23,7 @@ courseRoutes.get('/', async (c) => {
     });
   }
 
-  return c.json({ data: openSemester.courses.map((semesterCourse) => semesterCourse.course) });
+  return c.json({
+    data: openSemester.courses.map((semesterCourse) => ({ ...semesterCourse.course, theme: semesterCourse.theme, className: semesterCourse.className })),
+  });
 });

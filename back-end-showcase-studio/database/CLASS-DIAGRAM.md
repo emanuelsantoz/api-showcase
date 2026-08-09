@@ -55,6 +55,7 @@ classDiagram
     +String? submitterEmail
     +Int revision
     +String semesterId FK
+    +String className
     +String[] tags
     +String? liveUrl
     +String? prototypeUrl
@@ -71,7 +72,6 @@ classDiagram
     +Int number
     +String code UK
     +String label
-    +String? theme
     +DateTime startsAt
     +DateTime endsAt
     +SemesterStatus status
@@ -86,6 +86,8 @@ classDiagram
   class SemesterCourse {
     +String semesterId PK, FK
     +String courseId PK, FK
+    +String className PK
+    +String? theme
   }
 
   class ProjectPresentation {
@@ -148,3 +150,6 @@ classDiagram
 - Ao reenviar, o token anterior é invalidado.
 - A aprovação ou rejeição definitiva invalida tokens pendentes.
 - O arquivo físico fica no provider indicado em `storageProvider`; o Neon guarda apenas URL e metadados.
+- O semestre representa somente o período; cada `SemesterCourse` define o tema da disciplina/turma naquele período.
+- A chave de `SemesterCourse` permite o mesmo curso várias vezes no semestre, desde que a turma seja diferente.
+- Cada projeto pertence a uma única turma por meio de `courseId + className`.

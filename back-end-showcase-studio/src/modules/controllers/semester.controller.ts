@@ -6,13 +6,13 @@ const service = new SemesterService();
 const createSchema = z.object({
   year: z.number().int().min(2000).max(2100),
   number: z.union([z.literal(1), z.literal(2)]),
-  theme: z.string().min(1).max(255),
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date(),
 }).refine((value) => value.endsAt > value.startsAt, { message: 'endsAt deve ser posterior a startsAt.' });
 
-const themeSchema = z.object({ theme: z.string().max(255) });
-const coursesSchema = z.object({ courseIds: z.array(z.string().uuid()).max(100) });
+const coursesSchema = z.object({
+  courses: z.array(z.object({ courseId: z.string().uuid(), className: z.string().trim().min(1).max(80), theme: z.string().trim().min(1).max(255) })).max(100),
+});
 
 export class SemesterController {
   async list(c: Context) {
@@ -39,13 +39,8 @@ export class SemesterController {
     return c.json({ data: await service.close(c.req.param('id')!), message: 'Semestre encerrado.' }, 200);
   }
 
-  async updateTheme(c: Context) {
-    const body = themeSchema.parse(await c.req.json());
-    return c.json({ data: await service.updateTheme(c.req.param('id')!, body.theme), message: 'Tema atualizado.' }, 200);
-  }
-
   async setCourses(c: Context) {
     const body = coursesSchema.parse(await c.req.json());
-    return c.json({ data: await service.setCourses(c.req.param('id')!, body.courseIds), message: 'Disciplinas habilitadas para este semestre.' }, 200);
+    return c.json({ data: await service.setCourses(c.req.param('id')!, body.courses), message: 'Disciplinas e temas configurados para este semestre.' }, 200);
   }
 }

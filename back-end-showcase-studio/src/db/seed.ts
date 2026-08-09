@@ -151,19 +151,26 @@ async function main() {
     const dates = semesterDates(item.year, item.number);
     const semester = await prisma.semester.upsert({
       where: { code },
-      update: { label: `${item.number}º semestre de ${item.year}`, theme: item.theme, startsAt: dates.startsAt, endsAt: dates.endsAt, status: SemesterStatus.CLOSED },
-      create: { year: item.year, number: item.number, code, label: `${item.number}º semestre de ${item.year}`, theme: item.theme, startsAt: dates.startsAt, endsAt: dates.endsAt, status: SemesterStatus.CLOSED },
+      update: { label: `${item.number}º semestre de ${item.year}`, startsAt: dates.startsAt, endsAt: dates.endsAt, status: SemesterStatus.CLOSED },
+      create: { year: item.year, number: item.number, code, label: `${item.number}º semestre de ${item.year}`, startsAt: dates.startsAt, endsAt: dates.endsAt, status: SemesterStatus.CLOSED },
     });
     semesters.set(code, semester.id);
   }
 
+  const themesBySemester = new Map(semesterSeed.map((semester) => [`${semester.year}.${semester.number}`, semester.theme]));
   const semesterCourses = [...new Map(
     mockProjects.map((project) => [
       `${project.semesterCode}:${project.category}`,
-      { semesterId: semesters.get(project.semesterCode)!, courseId: courses.get(project.category)! },
+      { semesterId: semesters.get(project.semesterCode)!, courseId: courses.get(project.category)!, theme: themesBySemester.get(project.semesterCode)! },
     ]),
   ).values()];
-  await prisma.semesterCourse.createMany({ data: semesterCourses, skipDuplicates: true });
+  for (const semesterCourse of semesterCourses) {
+    await prisma.semesterCourse.upsert({
+      where: { semesterId_courseId_className: { semesterId: semesterCourse.semesterId, courseId: semesterCourse.courseId, className: 'Turma única' } },
+      update: { theme: semesterCourse.theme },
+      create: { ...semesterCourse, className: 'Turma única' },
+    });
+  }
 
   for (const project of mockProjects) {
     const courseId = courses.get(project.category)!;

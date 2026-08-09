@@ -19,6 +19,7 @@ export type PublicSubmissionInput = {
   shortDescription: string;
   description: string;
   courseId: string;
+  className: string;
   membersIds: string[];
   contributors: Array<{ name: string; email?: string; roleInfo?: string }>;
   submitterName: string;
@@ -47,7 +48,7 @@ export class SubmissionOrchestrator {
     const projectId = crypto.randomUUID();
     const semester = await this.semesters.getCurrent();
     if (!semester) throw new NoOpenSemesterError();
-    await this.semesters.assertCourseAcceptsProjects(semester.id, input.courseId);
+    await this.semesters.assertCourseAcceptsProjects(semester.id, input.courseId, input.className);
 
     try {
       const thumbnailStored = await uploadMedia(
@@ -73,6 +74,7 @@ export class SubmissionOrchestrator {
           shortDescription: input.shortDescription,
           description: input.description,
           courseId: input.courseId,
+          className: input.className,
           semesterId: semester.id,
           submitterName: input.submitterName,
           submitterEmail: input.submitterEmail,
@@ -102,7 +104,7 @@ export class SubmissionOrchestrator {
     }
   }
 
-  async resubmit(projectId: string, input: Omit<PublicSubmissionInput, 'courseId' | 'membersIds' | 'submitterName' | 'submitterEmail'>, accessToken: string) {
+  async resubmit(projectId: string, input: Omit<PublicSubmissionInput, 'courseId' | 'className' | 'membersIds' | 'submitterName' | 'submitterEmail'>, accessToken: string) {
     const previous = await prisma.project.findUnique({
       where: { id: projectId },
       include: { presentation: true },

@@ -8,7 +8,7 @@ import type { UploadableMedia } from '../storage/media.storage';
 const orchestrator = new SubmissionOrchestrator();
 const accessTokens = new AccessTokenService();
 type PublicMetadata = Omit<PublicSubmissionInput, 'thumbnail' | 'presentation'>;
-type ResubmissionMetadata = Omit<PublicMetadata, 'courseId' | 'membersIds' | 'submitterName' | 'submitterEmail'>;
+type ResubmissionMetadata = Omit<PublicMetadata, 'courseId' | 'className' | 'membersIds' | 'submitterName' | 'submitterEmail'>;
 
 export class SubmissionController {
   async create(c: Context) {
@@ -53,7 +53,7 @@ async function parseSubmissionBody(body: Record<string, unknown>): Promise<Publi
   return { ...metadata, thumbnail, presentation };
 }
 
-async function parseResubmissionBody(body: Record<string, unknown>): Promise<Omit<PublicSubmissionInput, 'courseId' | 'membersIds' | 'submitterName' | 'submitterEmail'>> {
+async function parseResubmissionBody(body: Record<string, unknown>): Promise<Omit<PublicSubmissionInput, 'courseId' | 'className' | 'membersIds' | 'submitterName' | 'submitterEmail'>> {
   const metadata = parseMetadata(body, false);
   const thumbnail = getFile(body.thumbnail);
   validateThumbnail(thumbnail);
@@ -71,7 +71,7 @@ function parseMetadata(body: Record<string, unknown>, identity: boolean): Public
     title: body.title,
     shortDescription: body.shortDescription,
     description: body.description,
-    ...(identity ? { courseId: body.courseId, submitterName: body.submitterName, submitterEmail: body.submitterEmail, membersIds: rawMembers } : {}),
+    ...(identity ? { courseId: body.courseId, className: body.className, submitterName: body.submitterName, submitterEmail: body.submitterEmail, membersIds: rawMembers } : {}),
     contributors: rawContributors,
     tags: rawTags,
     liveUrl: optionalString(body.liveUrl),
@@ -96,6 +96,7 @@ function parseMetadata(body: Record<string, unknown>, identity: boolean): Public
   return {
     ...common,
     courseId: data.courseId,
+    className: data.className,
     membersIds: data.membersIds,
     submitterName: data.submitterName,
     submitterEmail: data.submitterEmail,

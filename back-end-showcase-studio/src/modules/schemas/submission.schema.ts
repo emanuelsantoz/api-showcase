@@ -13,6 +13,7 @@ export const publicSubmissionSchema = z.object({
   shortDescription: z.string().min(10).max(255),
   description: z.string().min(20),
   courseId: z.string().uuid(),
+  className: z.string().trim().min(1).max(80),
   submitterName: z.string().min(2).max(120),
   submitterEmail: z.string().email(),
   membersIds: z.array(z.string().uuid()).default([]),
@@ -27,6 +28,7 @@ export const publicSubmissionSchema = z.object({
 
 export const publicResubmissionSchema = publicSubmissionSchema.omit({
   courseId: true,
+  className: true,
   submitterName: true,
   submitterEmail: true,
   membersIds: true,

@@ -93,6 +93,7 @@ model Project {
   prototypeUrl             String?
   repositoryUrl            String?
   courseId                 String
+  className                String               @default("Turma única")
   course                   Course               @relation(fields: [courseId], references: [id])
   semesterId               String
   semester                 Semester             @relation(fields: [semesterId], references: [id])
@@ -109,7 +110,7 @@ model Project {
 
   @@index([status, isFeatured])
   @@index([courseId])
-  @@index([semesterId, status])
+  @@index([semesterId, className, status])
   @@index([createdById])
 }
 
@@ -119,7 +120,6 @@ model Semester {
   number    Int
   code      String           @unique
   label     String
-  theme     String?
   startsAt  DateTime
   endsAt    DateTime
   status    SemesterStatus   @default(DRAFT)
@@ -135,10 +135,12 @@ model Semester {
 model SemesterCourse {
   semesterId String
   courseId   String
+  className  String   @default("Turma única")
+  theme      String?
   semester   Semester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
   course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  @@id([semesterId, courseId])
+  @@id([semesterId, courseId, className])
   @@index([courseId])
 }
 

@@ -278,14 +278,13 @@ GET   /api/v1/semesters/current
 POST  /api/v1/semesters                 # ADMIN ou COORDENADOR
 PATCH /api/v1/semesters/:id/open        # ADMIN ou COORDENADOR
 PATCH /api/v1/semesters/:id/close       # ADMIN ou COORDENADOR
-PATCH /api/v1/semesters/:id/theme       # ADMIN ou COORDENADOR
-PATCH /api/v1/semesters/:id/courses     # ADMIN ou COORDENADOR; body: { "courseIds": ["UUID"] }
+PATCH /api/v1/semesters/:id/courses     # ADMIN ou COORDENADOR; body: { "courses": [{ "courseId": "UUID", "className": "Turma A", "theme": "Tema da turma" }] }
 GET   /api/v1/courses                   # somente disciplinas do semestre OPEN
 GET   /api/v1/courses/admin             # ADMIN ou COORDENADOR; todas as disciplinas
 GET   /api/v1/projects?semesterId=UUID
 ```
 
-Uma submissÃ£o sem semestre aberto retorna `409`. O tema fica salvo no semestre e Ã© retornado na listagem para exibiÃ§Ã£o no front-end.
+Uma submissÃ£o sem semestre aberto retorna `409`. O tema fica salvo na relaÃ§Ã£o entre semestre, disciplina e turma (`SemesterCourse`). O mesmo curso pode ter vÃ¡rias turmas no perÃ­odo, e a API retorna `className` e `theme` em cada opÃ§Ã£o disponÃ­vel.
 
 ## Links, tags e integrantes pÃºblicos
 

@@ -18,6 +18,7 @@ type ProjectInput = {
   description: string;
   thumbnailUrl?: string;
   courseId: string;
+  className: string;
   membersIds: string[];
   presentation?: { type: 'CANVA'; url: string };
   tags?: string[];
@@ -51,7 +52,7 @@ export class ProjectService {
   async createProject(data: ProjectInput) {
     const semester = await this.semesters.getCurrent();
     if (!semester) throw new NoOpenSemesterError();
-    await this.semesters.assertCourseAcceptsProjects(semester.id, data.courseId);
+    await this.semesters.assertCourseAcceptsProjects(semester.id, data.courseId, data.className);
     return prisma.project.create({
       data: {
         title: data.title,
@@ -59,6 +60,7 @@ export class ProjectService {
         description: data.description,
         thumbnailUrl: data.thumbnailUrl,
         courseId: data.courseId,
+        className: data.className,
         semesterId: semester.id,
         tags: data.tags ?? [],
         liveUrl: data.liveUrl,
