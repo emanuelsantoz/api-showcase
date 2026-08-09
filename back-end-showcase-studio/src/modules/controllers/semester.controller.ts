@@ -14,25 +14,29 @@ const coursesSchema = z.object({
   courses: z.array(z.object({ courseId: z.string().uuid(), className: z.string().trim().min(1).max(80), theme: z.string().trim().min(1).max(255), tags: z.array(z.string().trim().min(1).max(40)).min(1).max(20) })).max(100),
 });
 
+function serializeSemester(semester: any) {
+  return { ...semester, courses: semester.courses?.map((course: any) => ({ ...course, tags: course.tags?.map((item: any) => item.tag.name) ?? [] })) };
+}
+
 export class SemesterController {
   async list(c: Context) {
     const includeArchived = c.req.query('includeArchived') === 'true';
-    return c.json({ data: await service.list(includeArchived) }, 200);
+    return c.json({ data: (await service.list(includeArchived)).map(serializeSemester) }, 200);
   }
 
   async current(c: Context) {
     const current = await service.getCurrent();
     if (!current) return c.json({ error: 'Not Found', message: 'Nenhum semestre está aberto para submissões.' }, 404);
-    return c.json({ data: current }, 200);
+    return c.json({ data: serializeSemester(current) }, 200);
   }
 
   async create(c: Context) {
     const body = createSchema.parse(await c.req.json());
-    return c.json({ data: await service.create(body), message: 'Semestre criado.' }, 201);
+    return c.json({ data: serializeSemester(await service.create(body)), message: 'Semestre criado.' }, 201);
   }
 
   async open(c: Context) {
-    return c.json({ data: await service.open(c.req.param('id')!), message: 'Semestre aberto para submissões.' }, 200);
+    return c.json({ data: serializeSemester(await service.open(c.req.param('id')!)), message: 'Semestre aberto para submissões.' }, 200);
   }
 
   async close(c: Context) {
@@ -41,6 +45,6 @@ export class SemesterController {
 
   async setCourses(c: Context) {
     const body = coursesSchema.parse(await c.req.json());
-    return c.json({ data: await service.setCourses(c.req.param('id')!, body.courses), message: 'Disciplinas e temas configurados para este semestre.' }, 200);
+    return c.json({ data: serializeSemester(await service.setCourses(c.req.param('id')!, body.courses)), message: 'Disciplinas e temas configurados para este semestre.' }, 200);
   }
 }

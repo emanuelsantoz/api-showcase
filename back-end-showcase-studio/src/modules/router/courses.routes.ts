@@ -22,10 +22,15 @@ courseRoutes.get('/admin', requireAuth, requireModerator, async (c) => {
   return c.json({ data: courses });
 });
 
+courseRoutes.get('/tags', requireAuth, requireModerator, async (c) => {
+  const tags = await prisma.tag.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } });
+  return c.json({ data: tags });
+});
+
 courseRoutes.get('/', async (c) => {
   const openSemester = await prisma.semester.findFirst({
     where: { status: SemesterStatus.OPEN },
-    include: { courses: { include: { course: true }, orderBy: { course: { name: 'asc' } } } },
+    include: { courses: { include: { course: true, tags: { include: { tag: true } } }, orderBy: { course: { name: 'asc' } } } },
   });
 
   if (!openSemester) {
@@ -36,6 +41,6 @@ courseRoutes.get('/', async (c) => {
   }
 
   return c.json({
-    data: openSemester.courses.map((semesterCourse) => ({ ...semesterCourse.course, theme: semesterCourse.theme, className: semesterCourse.className, tags: semesterCourse.tags })),
+    data: openSemester.courses.map((semesterCourse) => ({ ...semesterCourse.course, theme: semesterCourse.theme, className: semesterCourse.className, tags: semesterCourse.tags.map(({ tag }) => tag.name) })),
   });
 });

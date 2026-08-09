@@ -2,7 +2,7 @@ import { SemesterStatus } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 
 const semesterDetails = {
-  courses: { include: { course: true }, orderBy: { course: { name: 'asc' } } },
+  courses: { include: { course: true, tags: { include: { tag: true } } }, orderBy: { course: { name: 'asc' } } },
   _count: { select: { projects: { where: { status: 'APPROVED' } } } },
 } as const;
 
@@ -98,17 +98,23 @@ export class SemesterService {
       const semester = await tx.semester.findUnique({ where: { id }, select: { id: true } });
       if (!semester) throw new Error('Semester not found');
       await tx.semesterCourse.deleteMany({ where: { semesterId: id } });
-      if (uniqueCourses.length) {
-        await tx.semesterCourse.createMany({ data: uniqueCourses.map((course) => ({ semesterId: id, courseId: course.courseId, className: course.className, theme: course.theme.trim(), tags: [...new Set(course.tags.map((tag) => tag.trim()).filter(Boolean))] })) });
+      for (const course of uniqueCourses) {
+        const tagNames = [...new Set(course.tags.map((tag) => tag.trim()).filter(Boolean))];
+        const semesterCourse = await tx.semesterCourse.create({ data: { semesterId: id, courseId: course.courseId, className: course.className, theme: course.theme.trim() } });
+        for (const name of tagNames) {
+          const tag = await tx.tag.upsert({ where: { name }, create: { name }, update: {} });
+          await tx.semesterCourseTag.create({ data: { semesterId: semesterCourse.semesterId, courseId: semesterCourse.courseId, className: semesterCourse.className, tagId: tag.id } });
+        }
       }
       return tx.semester.findUniqueOrThrow({ where: { id }, include: semesterDetails });
     });
   }
 
   async assertCourseAcceptsProjects(semesterId: string, courseId: string, className: string, tags: string[] = []) {
-    const link = await prisma.semesterCourse.findUnique({ where: { semesterId_courseId_className: { semesterId, courseId, className } }, select: { semesterId: true, tags: true } });
+    const link = await prisma.semesterCourse.findUnique({ where: { semesterId_courseId_className: { semesterId, courseId, className } }, select: { tags: { select: { tag: { select: { name: true } } } } } });
     if (!link) throw new SemesterCourseConfigurationError('Esta turma não está habilitada para receber projetos no semestre aberto.');
-    const invalidTags = tags.filter((tag) => !link.tags.includes(tag));
+    const enabledTags = new Set(link.tags.map(({ tag }) => tag.name));
+    const invalidTags = tags.filter((tag) => !enabledTags.has(tag));
     if (invalidTags.length) throw new SemesterCourseConfigurationError(`As tags não estão habilitadas para esta turma: ${invalidTags.join(', ')}.`);
   }
 }

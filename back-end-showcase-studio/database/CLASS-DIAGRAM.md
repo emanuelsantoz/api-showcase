@@ -88,7 +88,18 @@ classDiagram
     +String courseId PK, FK
     +String className PK
     +String? theme
-    +String[] tags
+  }
+
+  class Tag {
+    +String id PK
+    +String name UK
+  }
+
+  class SemesterCourseTag {
+    +String semesterId PK, FK
+    +String courseId PK, FK
+    +String className PK, FK
+    +String tagId PK, FK
   }
 
   class ProjectPresentation {
@@ -133,6 +144,8 @@ classDiagram
   Semester "1" --> "0..*" Project : contains
   Semester "1" *-- "0..*" SemesterCourse : enabled disciplines
   Course "1" *-- "0..*" SemesterCourse : offered in
+  SemesterCourse "1" *-- "0..*" SemesterCourseTag : classified by
+  Tag "1" *-- "0..*" SemesterCourseTag : reusable tag
   Course "1" --> "0..*" Project : categorizes
   ProjectStatus <.. Project : status
   PresentationType <.. ProjectPresentation : type

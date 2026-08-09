@@ -82,6 +82,14 @@ model Course {
   semesterCourses SemesterCourse[]
 }
 
+model Tag {
+  id              String             @id @default(uuid())
+  name            String             @unique
+  semesterCourses SemesterCourseTag[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+}
+
 model Project {
   id                       String               @id @default(uuid())
   title                    String
@@ -146,12 +154,24 @@ model SemesterCourse {
   courseId   String
   className  String   @default("Turma única")
   theme      String?
-  tags       String[] @default([])
   semester   Semester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
   course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  tags       SemesterCourseTag[]
 
   @@id([semesterId, courseId, className])
   @@index([courseId])
+}
+
+model SemesterCourseTag {
+  semesterId String
+  courseId   String
+  className  String
+  tagId      String
+  semesterCourse SemesterCourse @relation(fields: [semesterId, courseId, className], references: [semesterId, courseId, className], onDelete: Cascade)
+  tag        Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([semesterId, courseId, className, tagId])
+  @@index([tagId])
 }
 
 model ProjectReview {
