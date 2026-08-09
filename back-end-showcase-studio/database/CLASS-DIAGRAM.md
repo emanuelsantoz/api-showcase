@@ -88,6 +88,7 @@ classDiagram
     +String courseId PK, FK
     +String className PK
     +String? theme
+    +String[] tags
   }
 
   class ProjectPresentation {

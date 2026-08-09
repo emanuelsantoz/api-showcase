@@ -11,7 +11,7 @@ const createSchema = z.object({
 }).refine((value) => value.endsAt > value.startsAt, { message: 'endsAt deve ser posterior a startsAt.' });
 
 const coursesSchema = z.object({
-  courses: z.array(z.object({ courseId: z.string().uuid(), className: z.string().trim().min(1).max(80), theme: z.string().trim().min(1).max(255) })).max(100),
+  courses: z.array(z.object({ courseId: z.string().uuid(), className: z.string().trim().min(1).max(80), theme: z.string().trim().min(1).max(255), tags: z.array(z.string().trim().min(1).max(40)).min(1).max(20) })).max(100),
 });
 
 export class SemesterController {

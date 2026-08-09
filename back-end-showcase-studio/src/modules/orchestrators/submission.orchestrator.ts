@@ -48,7 +48,7 @@ export class SubmissionOrchestrator {
     const projectId = crypto.randomUUID();
     const semester = await this.semesters.getCurrent();
     if (!semester) throw new NoOpenSemesterError();
-    await this.semesters.assertCourseAcceptsProjects(semester.id, input.courseId, input.className);
+    await this.semesters.assertCourseAcceptsProjects(semester.id, input.courseId, input.className, input.tags);
 
     try {
       const thumbnailStored = await uploadMedia(

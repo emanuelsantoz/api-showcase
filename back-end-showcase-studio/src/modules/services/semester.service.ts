@@ -13,7 +13,7 @@ export type CreateSemesterInput = {
   endsAt: Date;
 };
 
-export type SemesterCourseInput = { courseId: string; className: string; theme: string };
+export type SemesterCourseInput = { courseId: string; className: string; theme: string; tags: string[] };
 
 export class NoOpenSemesterError extends Error {
   constructor() {
@@ -99,14 +99,16 @@ export class SemesterService {
       if (!semester) throw new Error('Semester not found');
       await tx.semesterCourse.deleteMany({ where: { semesterId: id } });
       if (uniqueCourses.length) {
-        await tx.semesterCourse.createMany({ data: uniqueCourses.map((course) => ({ semesterId: id, courseId: course.courseId, className: course.className, theme: course.theme.trim() })) });
+        await tx.semesterCourse.createMany({ data: uniqueCourses.map((course) => ({ semesterId: id, courseId: course.courseId, className: course.className, theme: course.theme.trim(), tags: [...new Set(course.tags.map((tag) => tag.trim()).filter(Boolean))] })) });
       }
       return tx.semester.findUniqueOrThrow({ where: { id }, include: semesterDetails });
     });
   }
 
-  async assertCourseAcceptsProjects(semesterId: string, courseId: string, className: string) {
-    const link = await prisma.semesterCourse.findUnique({ where: { semesterId_courseId_className: { semesterId, courseId, className } }, select: { semesterId: true } });
+  async assertCourseAcceptsProjects(semesterId: string, courseId: string, className: string, tags: string[] = []) {
+    const link = await prisma.semesterCourse.findUnique({ where: { semesterId_courseId_className: { semesterId, courseId, className } }, select: { semesterId: true, tags: true } });
     if (!link) throw new SemesterCourseConfigurationError('Esta turma não está habilitada para receber projetos no semestre aberto.');
+    const invalidTags = tags.filter((tag) => !link.tags.includes(tag));
+    if (invalidTags.length) throw new SemesterCourseConfigurationError(`As tags não estão habilitadas para esta turma: ${invalidTags.join(', ')}.`);
   }
 }
