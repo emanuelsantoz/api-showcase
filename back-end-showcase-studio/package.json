@@ -12,7 +12,8 @@
     "db:seed": "prisma generate && tsx src/db/seed.ts"
   },
   "prisma": {
-    "seed": "tsx src/db/seed.ts"
+    "seed": "tsx src/db/seed.ts",
+    "db:seed:tags": "prisma generate && tsx src/db/seed-tags.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1106.0",

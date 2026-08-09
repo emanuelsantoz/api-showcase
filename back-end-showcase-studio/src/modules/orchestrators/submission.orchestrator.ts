@@ -37,6 +37,9 @@ export type PublicSubmissionInput = {
   } | {
     type: 'CANVA';
     url: string;
+  } | {
+    type: 'POWERPOINT';
+    url: string;
   };
 };
 
@@ -105,8 +108,8 @@ export class SubmissionOrchestrator {
           thumbnailStorageKey: thumbnail.key,
           ...(input.membersIds.length > 0 ? { members: { create: input.membersIds.map((userId) => ({ userId, roleInfo: 'Contributor' })) } } : {}),
           ...(input.contributors.length > 0 ? { contributors: { create: input.contributors.map(({ name, email, roleInfo, avatarUrl, avatarColor }) => ({ name, email, roleInfo, avatarUrl, avatarColor })) } } : {}),
-          ...(input.presentation.type === 'CANVA'
-            ? { presentation: { create: { type: 'CANVA', url: input.presentation.url, storageProvider: 'CANVA' } } }
+          ...(input.presentation.type === 'CANVA' || input.presentation.type === 'POWERPOINT'
+            ? { presentation: { create: { type: input.presentation.type, url: input.presentation.url, storageProvider: 'CANVA' } } }
             : { presentation: { create: { type: 'PDF', url: presentation!.url, storageProvider: presentation!.provider, storageKey: presentation!.key, contentType: presentation!.contentType, sizeBytes: presentation!.sizeBytes } } }),
         },
         include: details,

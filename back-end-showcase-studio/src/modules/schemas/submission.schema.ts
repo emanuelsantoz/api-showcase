@@ -25,8 +25,9 @@ export const publicSubmissionSchema = z.object({
   liveUrl: externalUrl.optional(),
   prototypeUrl: externalUrl.optional(),
   repositoryUrl: externalUrl.optional(),
-  presentationType: z.enum(['PDF', 'CANVA']),
+  presentationType: z.enum(['PDF', 'CANVA', 'POWERPOINT']),
   canvaUrl: z.string().url().optional(),
+  powerpointUrl: z.string().url().optional(),
 });
 
 export const publicResubmissionSchema = publicSubmissionSchema.omit({

@@ -86,6 +86,7 @@ function parseMetadata(body: Record<string, unknown>, identity: boolean): Public
     repositoryUrl: optionalString(body.repositoryUrl),
     presentationType: body.presentationType,
     canvaUrl: body.canvaUrl,
+    powerpointUrl: body.powerpointUrl,
   });
   if (!result.success) throw new z.ZodError(result.error.issues);
   const data = result.data as z.infer<typeof publicSubmissionSchema>;
@@ -115,6 +116,11 @@ function parsePresentation(body: Record<string, unknown>): PublicSubmissionInput
     const url = String(body.canvaUrl ?? '');
     if (!/^https?:\/\/(www\.)?canva\.com\/design\/.+\/view/i.test(url)) throw new Error('URL pública do Canva inválida.');
     return { type: 'CANVA', url };
+  }
+  if (body.presentationType === 'POWERPOINT') {
+    const url = String(body.powerpointUrl ?? '');
+    if (!/^https?:\/\/(www\.)?1drv\.ms\/p\/.+/i.test(url)) throw new Error('URL de incorporaÃ§Ã£o do PowerPoint invÃ¡lida.');
+    return { type: 'POWERPOINT', url };
   }
   const file = getFile(body.presentation);
   if (file.type !== 'application/pdf') throw new Error('A apresentação deve ser um PDF.');
