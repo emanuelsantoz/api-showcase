@@ -126,8 +126,17 @@ export class ProjectService {
     return { id };
   }
 
-  async updateContent(id: string, data: { title: string; shortDescription: string; description: string; tags: string[]; liveUrl?: string; prototypeUrl?: string; repositoryUrl?: string }) {
-    return prisma.project.update({ where: { id }, data: { title: data.title.trim(), shortDescription: data.shortDescription.trim(), description: data.description.trim(), tags: [...new Set(data.tags.map((tag) => tag.trim()).filter(Boolean))], liveUrl: data.liveUrl?.trim() || null, prototypeUrl: data.prototypeUrl?.trim() || null, repositoryUrl: data.repositoryUrl?.trim() || null }, include: details });
+  async updateContent(id: string, data: { title: string; shortDescription: string; description: string; submitterName?: string; submitterEmail?: string; courseId?: string; semesterId?: string; className?: string; tags: string[]; liveUrl?: string; prototypeUrl?: string; repositoryUrl?: string }) {
+    if (data.courseId || data.semesterId || data.className) {
+      const current = await prisma.project.findUnique({ where: { id }, select: { courseId: true, semesterId: true, className: true } });
+      if (!current) return null;
+      const courseId = data.courseId ?? current.courseId;
+      const semesterId = data.semesterId ?? current.semesterId;
+      const className = data.className?.trim() || current.className;
+      const offering = await prisma.semesterCourse.findUnique({ where: { semesterId_courseId_className: { semesterId, courseId, className } } });
+      if (!offering) throw new Error('A disciplina não está vinculada a essa turma e semestre.');
+    }
+    return prisma.project.update({ where: { id }, data: { title: data.title.trim(), shortDescription: data.shortDescription.trim(), description: data.description.trim(), submitterName: data.submitterName?.trim(), submitterEmail: data.submitterEmail?.trim() || null, courseId: data.courseId, semesterId: data.semesterId, className: data.className?.trim(), tags: [...new Set(data.tags.map((tag) => tag.trim()).filter(Boolean))], liveUrl: data.liveUrl?.trim() || null, prototypeUrl: data.prototypeUrl?.trim() || null, repositoryUrl: data.repositoryUrl?.trim() || null }, include: details });
   }
 
   async canManageProject(id: string, userId: string, role: string) {
