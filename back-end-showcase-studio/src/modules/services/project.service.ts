@@ -1,6 +1,6 @@
 import { prisma } from '../../db/prisma';
 import { ProjectStatus, StorageProvider } from '@prisma/client';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { deleteMedia, resolveStorageProvider, uploadMedia, type UploadableMedia } from '../storage/media.storage';
 import { NoOpenSemesterError, SemesterCourseConfigurationError, SemesterService } from './semester.service';
 
@@ -234,13 +234,15 @@ export class ProjectService {
   async uploadThumbnail(id: string, file: UploadableMedia) {
     const previous = await prisma.project.findUnique({ where: { id }, select: { thumbnailStorageProvider: true, thumbnailStorageKey: true, thumbnailUrl: true } });
     const provider = resolveStorageProvider('THUMBNAIL');
-    const stored = await uploadMedia(`projects/${id}/thumbnail`, file, provider);
+    const extension = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'webp';
+    const stored = await uploadMedia(`projects/${id}/thumbnails/${randomUUID()}.${extension}`, file, provider);
     const updated = await prisma.project.update({
       where: { id },
       data: { thumbnailUrl: stored.url, thumbnailStorageProvider: stored.provider, thumbnailStorageKey: stored.key },
       include: details,
     });
-    if (previous?.thumbnailStorageProvider && previous.thumbnailStorageKey) {
+    if (previous?.thumbnailStorageProvider && previous.thumbnailStorageKey
+      && (previous.thumbnailStorageProvider !== stored.provider || previous.thumbnailStorageKey !== stored.key)) {
       // A nova thumbnail já foi salva; a limpeza da antiga não deve desfazer a atualização.
       await deleteMedia(previous.thumbnailStorageProvider, previous.thumbnailStorageKey || previous.thumbnailUrl).catch((error) => {
         console.error('[ProjectService] previous thumbnail cleanup failed', {

@@ -43,6 +43,11 @@ export type PublicSubmissionInput = {
   };
 };
 
+function thumbnailObjectKey(projectId: string, mimeType: string) {
+  const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/png' ? 'png' : 'webp';
+  return `projects/${projectId}/thumbnails/${crypto.randomUUID()}.${extension}`;
+}
+
 export class SubmissionOrchestrator {
   private readonly accessTokens = new AccessTokenService();
   private readonly semesters = new SemesterService();
@@ -59,7 +64,7 @@ export class SubmissionOrchestrator {
 
     try {
       const thumbnailStored = await uploadMedia(
-        `projects/${projectId}/thumbnail`,
+        thumbnailObjectKey(projectId, input.thumbnail.type),
         input.thumbnail,
         resolveStorageProvider('THUMBNAIL'),
       );
@@ -133,7 +138,7 @@ export class SubmissionOrchestrator {
     });
     if (!previous) throw new Error('Project not found.');
 
-    const thumbnail = await uploadMedia(`projects/${projectId}/thumbnail`, input.thumbnail, resolveStorageProvider('THUMBNAIL'));
+    const thumbnail = await uploadMedia(thumbnailObjectKey(projectId, input.thumbnail.type), input.thumbnail, resolveStorageProvider('THUMBNAIL'));
     let presentation: { url: string; key: string | null; provider: StorageProvider; contentType?: string; sizeBytes?: number };
     if (input.presentation.type === 'PDF') {
       const stored = await uploadMedia(`projects/${projectId}/presentation.pdf`, input.presentation.file, resolveStorageProvider('PRESENTATION_PDF'));
