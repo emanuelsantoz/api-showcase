@@ -54,6 +54,7 @@ export class ProjectService {
     const projects = await prisma.project.findMany({
       where: { status: ProjectStatus.APPROVED },
       select: {
+        courseId: true,
         viewsCount: true,
         likesCount: true,
         submitterName: true,
@@ -73,6 +74,7 @@ export class ProjectService {
     return {
       publishedProjects: projects.length,
       participatingStudents: students.size,
+      courses: new Set(projects.map((project) => project.courseId)).size,
       totalViews: projects.reduce((total, project) => total + project.viewsCount, 0),
       totalLikes: projects.reduce((total, project) => total + project.likesCount, 0),
     };
