@@ -11,7 +11,7 @@ const contributorSchema = z.object({
 });
 
 export const publicSubmissionSchema = z.object({
-  title: z.string().min(5).max(100),
+  title: z.string().trim().min(1).max(100),
   shortDescription: z.string().min(10).max(255),
   description: z.string().min(20),
   courseId: z.string().uuid(),

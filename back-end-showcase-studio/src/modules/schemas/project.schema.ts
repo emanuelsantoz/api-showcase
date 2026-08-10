@@ -3,7 +3,7 @@ import { z } from 'zod';
 const externalUrl = z.string().url().refine((value) => ['http:', 'https:'].includes(new URL(value).protocol), 'Use uma URL HTTP ou HTTPS.');
 
 export const createProjectSchema = z.object({
-  title: z.string().min(5).max(100),
+  title: z.string().trim().min(1).max(100),
   shortDescription: z.string().min(10).max(255),
   description: z.string().min(20),
   thumbnailUrl: z.string().url().optional(),
@@ -38,7 +38,7 @@ export const queryProjectSchema = z.object({
 });
 
 export const updateProjectContentSchema = z.object({
-  title: z.string().min(5).max(100),
+  title: z.string().trim().min(1).max(100),
   shortDescription: z.string().min(10).max(255),
   description: z.string().min(20),
   tags: z.array(z.string().trim().min(1).max(40)).max(20),
