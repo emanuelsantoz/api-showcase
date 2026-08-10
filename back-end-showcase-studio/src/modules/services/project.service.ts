@@ -184,7 +184,14 @@ export class ProjectService {
       include: details,
     });
     if (previous?.thumbnailStorageProvider && previous.thumbnailStorageKey) {
-      await deleteMedia(previous.thumbnailStorageProvider, previous.thumbnailStorageKey || previous.thumbnailUrl);
+      // A nova thumbnail já foi salva; a limpeza da antiga não deve desfazer a atualização.
+      await deleteMedia(previous.thumbnailStorageProvider, previous.thumbnailStorageKey || previous.thumbnailUrl).catch((error) => {
+        console.error('[ProjectService] previous thumbnail cleanup failed', {
+          id,
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+      });
     }
     return updated;
   }

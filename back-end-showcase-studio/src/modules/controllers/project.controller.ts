@@ -5,6 +5,16 @@ import type { UploadableMedia } from '../storage/media.storage';
 const projectService = new ProjectService();
 
 export class ProjectController {
+  constructor() {
+    // Hono recebe os handlers como callbacks. Sem o binding, os métodos que
+    // usam `this.canManage()` perdem o contexto da instância em produção.
+    this.updateContent = this.updateContent.bind(this);
+    this.setCanvaPresentation = this.setCanvaPresentation.bind(this);
+    this.uploadThumbnail = this.uploadThumbnail.bind(this);
+    this.uploadPdf = this.uploadPdf.bind(this);
+    this.deletePresentation = this.deletePresentation.bind(this);
+  }
+
   async getAll(c: Context) {
     const query = c.req.query();
     const result = await projectService.listProjects({
