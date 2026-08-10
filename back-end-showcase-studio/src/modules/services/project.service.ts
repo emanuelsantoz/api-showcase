@@ -104,6 +104,10 @@ export class ProjectService {
     return prisma.project.update({ where: { id }, data: { status, ...(isFeatured !== undefined && { isFeatured }) }, include: details });
   }
 
+  async updateContent(id: string, data: { title: string; shortDescription: string; description: string; tags: string[]; liveUrl?: string; prototypeUrl?: string; repositoryUrl?: string }) {
+    return prisma.project.update({ where: { id }, data: { title: data.title.trim(), shortDescription: data.shortDescription.trim(), description: data.description.trim(), tags: [...new Set(data.tags.map((tag) => tag.trim()).filter(Boolean))], liveUrl: data.liveUrl?.trim() || null, prototypeUrl: data.prototypeUrl?.trim() || null, repositoryUrl: data.repositoryUrl?.trim() || null }, include: details });
+  }
+
   async canManageProject(id: string, userId: string, role: string) {
     const project = await prisma.project.findUnique({ where: { id }, select: { createdById: true } });
     if (!project) return false;

@@ -47,6 +47,12 @@ export class ProjectController {
     return c.json({ message: 'Status de moderação atualizado.', updated }, 200);
   }
 
+  async updateContent(c: Context) {
+    if (!(await this.canManage(c))) return c.json({ error: 'Forbidden', message: 'You cannot edit this project.' }, 403);
+    const updated = await projectService.updateContent(c.req.param('id')!, await c.req.json());
+    return c.json({ data: updated, message: 'Conteúdo do projeto atualizado.' }, 200);
+  }
+
   private async canManage(c: Context) {
     const user = c.get('user') as { id: string; role: string };
     return projectService.canManageProject(c.req.param('id')!, user.id, user.role);

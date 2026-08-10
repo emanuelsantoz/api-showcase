@@ -36,3 +36,13 @@ export const queryProjectSchema = z.object({
   page: z.string().optional().default('1'),
   limit: z.string().optional().default('12'),
 });
+
+export const updateProjectContentSchema = z.object({
+  title: z.string().min(5).max(100),
+  shortDescription: z.string().min(10).max(255),
+  description: z.string().min(20),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20),
+  liveUrl: externalUrl.optional().or(z.literal('')),
+  prototypeUrl: externalUrl.optional().or(z.literal('')),
+  repositoryUrl: externalUrl.optional().or(z.literal('')),
+});
