@@ -40,6 +40,10 @@ export class ProjectController {
     return c.json({ data: project }, 200);
   }
 
+  async getPublicStats(c: Context) {
+    return c.json({ data: await projectService.getPublicStats() }, 200);
+  }
+
   async incrementViews(c: Context) {
     const result = await projectService.incrementViews(c.req.param('id')!);
     if (!result) return c.json({ error: 'Not Found', message: 'Projeto não encontrado.' }, 404);

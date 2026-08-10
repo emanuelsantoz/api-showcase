@@ -103,6 +103,7 @@ Guarde o token apenas no cliente e nunca o envie para o repositório.
 | `POST` | `/users/professors` | JWT + moderador | Cria um professor com senha temporária. |
 | `GET` | `/courses` | Não | Lista os cursos. |
 | `GET` | `/projects` | Não | Lista projetos aprovados com paginação. |
+| `GET` | `/projects/stats` | Não | Retorna projetos publicados, alunos (integrantes), visualizações e likes. |
 | `GET` | `/projects/:id` | Não | Busca um projeto aprovado. |
 | `POST` | `/projects` | JWT | Cria um projeto para moderação. |
 | `POST` | `/projects/:id/thumbnail` | JWT + autor/moderador | Envia a miniatura como `multipart/form-data` (`file`). |
@@ -110,7 +111,7 @@ Guarde o token apenas no cliente e nunca o envie para o repositório.
 | `POST` | `/projects/:id/presentation/pdf` | JWT + autor/moderador | Envia o PDF como `multipart/form-data` (`file`). |
 | `DELETE` | `/projects/:id/presentation` | JWT + autor/moderador | Remove a apresentação e o arquivo remoto. |
 | `PATCH` | `/projects/:id/view` | Não | Incrementa o total de visualizações. |
-| `POST` | `/projects/:id/like` | JWT | Alterna o like do usuário autenticado. |
+| `POST` | `/projects/:id/like` | Não | Alterna o like anônimo por navegador usando `visitorId`. |
 | `PATCH` | `/projects/:id/status` | JWT + moderador | Atualiza status/destaque do projeto. |
 
 ## Exemplos

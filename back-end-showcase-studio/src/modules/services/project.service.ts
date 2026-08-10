@@ -50,6 +50,34 @@ export class ProjectService {
     return prisma.project.findFirst({ where: { id, status: ProjectStatus.APPROVED }, include: details });
   }
 
+  async getPublicStats() {
+    const projects = await prisma.project.findMany({
+      where: { status: ProjectStatus.APPROVED },
+      select: {
+        viewsCount: true,
+        likesCount: true,
+        submitterName: true,
+        submitterEmail: true,
+        contributors: { select: { name: true, email: true } },
+      },
+    });
+    const students = new Set<string>();
+    const addStudent = (name: string | null | undefined, email: string | null | undefined) => {
+      const identity = (email || name || '').trim().toLocaleLowerCase();
+      if (identity) students.add(identity);
+    };
+    for (const project of projects) {
+      addStudent(project.submitterName, project.submitterEmail);
+      for (const contributor of project.contributors) addStudent(contributor.name, contributor.email);
+    }
+    return {
+      publishedProjects: projects.length,
+      participatingStudents: students.size,
+      totalViews: projects.reduce((total, project) => total + project.viewsCount, 0),
+      totalLikes: projects.reduce((total, project) => total + project.likesCount, 0),
+    };
+  }
+
   async createProject(data: ProjectInput) {
     const semester = await this.semesters.getCurrent();
     if (!semester) throw new NoOpenSemesterError();

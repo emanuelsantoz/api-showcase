@@ -13,6 +13,7 @@ router.get('/', zValidator('query', queryProjectSchema, (result, c) => {
     return c.json({ error: 'Invalid query parameters', details: result.error }, 400);
   }
 }), controller.getAll);
+router.get('/stats', controller.getPublicStats);
 router.get('/:id', controller.getById);
 router.patch('/:id/view', controller.incrementViews);
 
