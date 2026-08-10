@@ -104,6 +104,28 @@ export class ProjectService {
     return prisma.project.update({ where: { id }, data: { status, ...(isFeatured !== undefined && { isFeatured }) }, include: details });
   }
 
+  async delete(id: string) {
+    const project = await prisma.project.findUnique({
+      where: { id },
+      select: {
+        thumbnailStorageProvider: true,
+        thumbnailStorageKey: true,
+        thumbnailUrl: true,
+        presentation: { select: { storageProvider: true, storageKey: true, url: true } },
+      },
+    });
+    if (!project) return null;
+
+    await prisma.project.delete({ where: { id } });
+    if (project.thumbnailStorageProvider) {
+      await deleteMedia(project.thumbnailStorageProvider, project.thumbnailStorageKey || project.thumbnailUrl);
+    }
+    if (project.presentation?.storageProvider) {
+      await deleteMedia(project.presentation.storageProvider, project.presentation.storageKey || project.presentation.url);
+    }
+    return { id };
+  }
+
   async updateContent(id: string, data: { title: string; shortDescription: string; description: string; tags: string[]; liveUrl?: string; prototypeUrl?: string; repositoryUrl?: string }) {
     return prisma.project.update({ where: { id }, data: { title: data.title.trim(), shortDescription: data.shortDescription.trim(), description: data.description.trim(), tags: [...new Set(data.tags.map((tag) => tag.trim()).filter(Boolean))], liveUrl: data.liveUrl?.trim() || null, prototypeUrl: data.prototypeUrl?.trim() || null, repositoryUrl: data.repositoryUrl?.trim() || null }, include: details });
   }

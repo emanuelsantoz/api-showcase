@@ -47,6 +47,12 @@ export class ProjectController {
     return c.json({ message: 'Status de moderação atualizado.', updated }, 200);
   }
 
+  async remove(c: Context) {
+    const deleted = await projectService.delete(c.req.param('id')!);
+    if (!deleted) return c.json({ error: 'Not Found', message: 'Projeto não encontrado.' }, 404);
+    return c.json({ message: 'Projeto excluído.' }, 200);
+  }
+
   async updateContent(c: Context) {
     if (!(await this.canManage(c))) return c.json({ error: 'Forbidden', message: 'You cannot edit this project.' }, 403);
     const updated = await projectService.updateContent(c.req.param('id')!, await c.req.json());

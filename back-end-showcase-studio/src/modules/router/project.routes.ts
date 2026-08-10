@@ -21,6 +21,7 @@ router.patch('/:id/view', controller.incrementViews);
 router.post('/', requireAuth, zValidator('json', createProjectSchema), controller.create);
 router.post('/:id/like', requireAuth, controller.handleLike);
 router.patch('/:id/status', requireAuth, requireModerator, zValidator('json', updateProjectStatusSchema), controller.moderate);
+router.delete('/:id', requireAuth, requireModerator, controller.remove);
 router.patch('/:id/content', requireAuth, zValidator('json', updateProjectContentSchema), controller.updateContent);
 router.post('/:id/thumbnail', requireAuth, controller.uploadThumbnail);
 router.post('/:id/presentation/canva', requireAuth, zValidator('json', canvaPresentationSchema), controller.setCanvaPresentation);
