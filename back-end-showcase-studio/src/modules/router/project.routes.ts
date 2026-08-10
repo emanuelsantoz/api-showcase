@@ -19,7 +19,7 @@ router.patch('/:id/view', controller.incrementViews);
 // Rotas de Projeto (criação, like, moderação) 
 // Refatorar para caso queira dar like -> ter autenticação
 router.post('/', requireAuth, zValidator('json', createProjectSchema), controller.create);
-router.post('/:id/like', requireAuth, controller.handleLike);
+router.post('/:id/like', controller.handleLike);
 router.patch('/:id/status', requireAuth, requireModerator, zValidator('json', updateProjectStatusSchema), controller.moderate);
 router.delete('/:id', requireAuth, requireModerator, controller.remove);
 router.patch('/:id/content', requireAuth, zValidator('json', updateProjectContentSchema), controller.updateContent);

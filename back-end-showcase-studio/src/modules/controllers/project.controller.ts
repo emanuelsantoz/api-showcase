@@ -32,13 +32,18 @@ export class ProjectController {
 
   async incrementViews(c: Context) {
     const result = await projectService.incrementViews(c.req.param('id')!);
-    return c.json(result, 200);
+    if (!result) return c.json({ error: 'Not Found', message: 'Projeto não encontrado.' }, 404);
+    return c.json({ data: result }, 200);
   }
 
   async handleLike(c: Context) {
-    const user = c.get('user') as { id: string };
-    const result = await projectService.toggleLike(c.req.param('id')!, user.id);
-    return c.json(result, 200);
+    const body = await c.req.json<{ visitorId?: string }>();
+    if (!body.visitorId || body.visitorId.length < 16 || body.visitorId.length > 200) {
+      return c.json({ error: 'Bad Request', message: 'Identificador de visitante inválido.' }, 400);
+    }
+    const result = await projectService.toggleAnonymousLike(c.req.param('id')!, body.visitorId);
+    if (!result) return c.json({ error: 'Not Found', message: 'Projeto não encontrado.' }, 404);
+    return c.json({ data: result }, 200);
   }
 
   async moderate(c: Context) {

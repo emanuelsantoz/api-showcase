@@ -122,6 +122,7 @@ model Project {
   members                  ProjectMember[]
   contributors             ProjectContributor[]
   likes                    Like[]
+  anonymousLikes           AnonymousLike[]
   presentation             ProjectPresentation?
   reviews                  ProjectReview[]
   accessTokens             ProjectAccessToken[]
@@ -247,4 +248,14 @@ model Like {
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@id([userId, projectId])
+}
+
+model AnonymousLike {
+  projectId   String
+  visitorHash String
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, visitorHash])
+  @@index([projectId])
 }

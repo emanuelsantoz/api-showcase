@@ -1,5 +1,6 @@
 import { prisma } from '../../db/prisma';
 import { ProjectStatus, StorageProvider } from '@prisma/client';
+import { createHash } from 'node:crypto';
 import { deleteMedia, resolveStorageProvider, uploadMedia, type UploadableMedia } from '../storage/media.storage';
 import { NoOpenSemesterError, SemesterService } from './semester.service';
 
@@ -80,6 +81,8 @@ export class ProjectService {
   }
 
   async incrementViews(id: string) {
+    const visible = await prisma.project.findFirst({ where: { id, status: ProjectStatus.APPROVED }, select: { id: true } });
+    if (!visible) return null;
     return prisma.project.update({ where: { id }, data: { viewsCount: { increment: 1 } }, select: { id: true, viewsCount: true } });
   }
 
@@ -94,6 +97,24 @@ export class ProjectService {
         await tx.project.update({ where: { id: projectId }, data: { likesCount: { decrement: 1 } } });
       } else {
         await tx.like.create({ data: { userId, projectId } });
+        await tx.project.update({ where: { id: projectId }, data: { likesCount: { increment: 1 } } });
+      }
+      return { liked, likesCount: project.likesCount + (liked ? 1 : -1) };
+    });
+  }
+
+  async toggleAnonymousLike(projectId: string, visitorId: string) {
+    const visitorHash = createHash('sha256').update(visitorId).digest('hex');
+    return prisma.$transaction(async (tx) => {
+      const project = await tx.project.findFirst({ where: { id: projectId, status: ProjectStatus.APPROVED }, select: { likesCount: true } });
+      if (!project) return null;
+      const existing = await tx.anonymousLike.findUnique({ where: { projectId_visitorHash: { projectId, visitorHash } } });
+      const liked = !existing;
+      if (existing) {
+        await tx.anonymousLike.delete({ where: { projectId_visitorHash: { projectId, visitorHash } } });
+        await tx.project.update({ where: { id: projectId }, data: { likesCount: { decrement: 1 } } });
+      } else {
+        await tx.anonymousLike.create({ data: { projectId, visitorHash } });
         await tx.project.update({ where: { id: projectId }, data: { likesCount: { increment: 1 } } });
       }
       return { liked, likesCount: project.likesCount + (liked ? 1 : -1) };
