@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-const externalUrl = z.string().url().refine((value) => ['http:', 'https:'].includes(new URL(value).protocol), 'Use uma URL HTTP ou HTTPS.');
+const externalUrl = z.string().url().refine((value) => {
+  try {
+    return ['http:', 'https:'].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}, 'Use uma URL HTTP ou HTTPS.');
 
 export const createProjectSchema = z.object({
   title: z.string().trim().min(1).max(100),
