@@ -12,7 +12,7 @@ import { semesterRoutes } from './modules/router/semester.routes';
 import { userRoutes } from './modules/router/users.routes';
 import { dashboardRoutes } from './modules/router/dashboard.routes';
 import { env } from './config/env';
-import { NoOpenSemesterError, SemesterCourseConfigurationError } from './modules/services/semester.service';
+import { NoOpenSemesterError, SemesterCourseConfigurationError, SemesterDeletionError } from './modules/services/semester.service';
 import { MediaStorageError } from './modules/storage/media.storage';
 
 const app = new Hono().basePath('/api/v1');
@@ -45,6 +45,7 @@ app.onError((err, c) => {
   if (err instanceof NoOpenSemesterError) return c.json({ error: 'Conflict', message: err.message }, 409);
   if (err instanceof z.ZodError) return c.json({ error: 'Bad Request', message: 'Dados de submissão inválidos.', details: err.issues }, 400);
   if (err instanceof SemesterCourseConfigurationError) return c.json({ error: 'Unprocessable Entity', message: err.message }, 422);
+  if (err instanceof SemesterDeletionError) return c.json({ error: 'Conflict', message: err.message }, 409);
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2025') return c.json({ error: 'Not Found', message: 'Resource not found.' }, 404);
     if (err.code === 'P2002') return c.json({ error: 'Conflict', message: 'A resource with this value already exists.' }, 409);

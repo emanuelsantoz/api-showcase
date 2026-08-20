@@ -29,6 +29,13 @@ export class SemesterCourseConfigurationError extends Error {
   }
 }
 
+export class SemesterDeletionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SemesterDeletionError';
+  }
+}
+
 export class SemesterService {
   async list(includeArchived = false) {
     return prisma.semester.findMany({
@@ -63,6 +70,22 @@ export class SemesterService {
       },
       include: semesterDetails,
     });
+  }
+
+  async remove(id: string) {
+    const semester = await prisma.semester.findUnique({
+      where: { id },
+      select: { id: true, label: true, status: true, _count: { select: { projects: true } } },
+    });
+    if (!semester) throw new SemesterDeletionError('Semestre não encontrado.');
+    if (semester.status === SemesterStatus.OPEN) {
+      throw new SemesterDeletionError('Encerre o recebimento de projetos antes de remover este semestre.');
+    }
+    if (semester._count.projects > 0) {
+      throw new SemesterDeletionError(`Este semestre possui ${semester._count.projects} projeto(s) vinculado(s) e não pode ser removido.`);
+    }
+
+    return prisma.semester.delete({ where: { id }, select: { id: true, label: true } });
   }
 
   async open(id: string) {

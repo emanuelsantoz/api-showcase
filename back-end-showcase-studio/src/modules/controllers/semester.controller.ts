@@ -35,6 +35,11 @@ export class SemesterController {
     return c.json({ data: serializeSemester(await service.create(body)), message: 'Semestre criado.' }, 201);
   }
 
+  async remove(c: Context) {
+    const semester = await service.remove(c.req.param('id')!);
+    return c.json({ data: semester, message: 'Semestre removido.' }, 200);
+  }
+
   async open(c: Context) {
     return c.json({ data: serializeSemester(await service.open(c.req.param('id')!)), message: 'Semestre aberto para submissões.' }, 200);
   }
