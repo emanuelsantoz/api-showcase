@@ -1,7 +1,9 @@
 import type { Context } from 'hono';
 import { ReviewService } from '../services/review.service';
+import { AuditService } from '../services/audit.service';
 
 const reviewService = new ReviewService();
+const audit = new AuditService();
 
 export class ModerationController {
   async list(c: Context) {
@@ -18,6 +20,7 @@ export class ModerationController {
   async approve(c: Context) {
     const user = c.get('user') as { id: string };
     const project = await reviewService.approve(c.req.param('id')!, user.id);
+    await audit.record({ actorUserId: user.id, action: 'project.approved', resource: 'project', resourceId: project.id });
     return c.json({ data: project, message: 'Projeto publicado.' }, 200);
   }
 
@@ -25,6 +28,7 @@ export class ModerationController {
     const user = c.get('user') as { id: string };
     const body = await c.req.json<{ reason: string }>();
     const result = await reviewService.requestChanges(c.req.param('id')!, user.id, body.reason);
+    await audit.record({ actorUserId: user.id, action: 'project.changes_requested', resource: 'project', resourceId: result.project.id });
     return c.json({ data: result.project, editUrl: result.editUrl, emailSent: result.emailSent, message: 'Solicitação de alterações registrada.' }, 200);
   }
 
@@ -32,6 +36,7 @@ export class ModerationController {
     const user = c.get('user') as { id: string };
     const body = await c.req.json<{ reason: string }>();
     const project = await reviewService.reject(c.req.param('id')!, user.id, body.reason);
+    await audit.record({ actorUserId: user.id, action: 'project.rejected', resource: 'project', resourceId: project.id });
     return c.json({ data: project, message: 'Projeto rejeitado.' }, 200);
   }
 }

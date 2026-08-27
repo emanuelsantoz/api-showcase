@@ -13,6 +13,39 @@ const details = {
   _count: { select: { likes: true } },
 } as const;
 
+// Nunca use `include` em uma resposta pública: ele retorna todos os campos
+// escalares do projeto, inclusive e-mails. Este select é a fronteira de dados
+// entre a curadoria e o portfólio público.
+const publicProjectSelect = {
+  id: true,
+  title: true,
+  shortDescription: true,
+  description: true,
+  thumbnailUrl: true,
+  status: true,
+  isFeatured: true,
+  viewsCount: true,
+  likesCount: true,
+  tags: true,
+  liveUrl: true,
+  prototypeUrl: true,
+  repositoryUrl: true,
+  courseId: true,
+  className: true,
+  semesterId: true,
+  submitterName: true,
+  submitterAvatarUrl: true,
+  submitterAvatarColor: true,
+  createdAt: true,
+  updatedAt: true,
+  course: { select: { id: true, name: true } },
+  semester: { select: { id: true, year: true, number: true, code: true, label: true, startsAt: true, endsAt: true } },
+  presentation: { select: { id: true, projectId: true, type: true, url: true } },
+  members: { select: { roleInfo: true, user: { select: { id: true, name: true } } } },
+  contributors: { select: { id: true, name: true, roleInfo: true, avatarUrl: true, avatarColor: true } },
+  _count: { select: { likes: true } },
+} as const;
+
 type ProjectInput = {
   title: string;
   shortDescription: string;
@@ -40,14 +73,14 @@ export class ProjectService {
     if (filters.isFeatured !== undefined) where.isFeatured = filters.isFeatured;
 
     const [projects, total] = await prisma.$transaction([
-      prisma.project.findMany({ where, skip, take: filters.limit, include: details, orderBy: { createdAt: 'desc' } }),
+      prisma.project.findMany({ where, skip, take: filters.limit, select: publicProjectSelect, orderBy: { createdAt: 'desc' } }),
       prisma.project.count({ where }),
     ]);
     return { data: projects, meta: { total, page: filters.page, limit: filters.limit, totalPages: Math.ceil(total / filters.limit) } };
   }
 
   async getProject(id: string) {
-    return prisma.project.findFirst({ where: { id, status: ProjectStatus.APPROVED }, include: details });
+    return prisma.project.findFirst({ where: { id, status: ProjectStatus.APPROVED }, select: publicProjectSelect });
   }
 
   async getPublicStats() {
@@ -110,10 +143,20 @@ export class ProjectService {
     });
   }
 
-  async incrementViews(id: string) {
+  async incrementViews(id: string, visitorId: string) {
+    const visitorHash = createHash('sha256').update(visitorId).digest('hex');
     const visible = await prisma.project.findFirst({ where: { id, status: ProjectStatus.APPROVED }, select: { id: true } });
     if (!visible) return null;
-    return prisma.project.update({ where: { id }, data: { viewsCount: { increment: 1 } }, select: { id: true, viewsCount: true } });
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.anonymousView.findUnique({ where: { projectId_visitorHash: { projectId: id, visitorHash } } });
+      if (existing) {
+        const project = await tx.project.findUniqueOrThrow({ where: { id }, select: { id: true, viewsCount: true } });
+        return { ...project, counted: false };
+      }
+      await tx.anonymousView.create({ data: { projectId: id, visitorHash } });
+      const project = await tx.project.update({ where: { id }, data: { viewsCount: { increment: 1 } }, select: { id: true, viewsCount: true } });
+      return { ...project, counted: true };
+    });
   }
 
   async toggleLike(projectId: string, userId: string) {

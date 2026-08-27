@@ -123,6 +123,7 @@ model Project {
   contributors             ProjectContributor[]
   likes                    Like[]
   anonymousLikes           AnonymousLike[]
+  anonymousViews           AnonymousView[]
   presentation             ProjectPresentation?
   reviews                  ProjectReview[]
   accessTokens             ProjectAccessToken[]
@@ -258,4 +259,30 @@ model AnonymousLike {
 
   @@id([projectId, visitorHash])
   @@index([projectId])
+}
+
+// Não contém nome, e-mail, IP ou conta: somente o hash de um UUID aleatório
+// criado pelo navegador para impedir contagem repetida por projeto.
+model AnonymousView {
+  projectId   String
+  visitorHash String
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, visitorHash])
+  @@index([projectId])
+}
+
+// Histórico administrativo sem copiar conteúdo, e-mails ou tokens de acesso.
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorUserId String?
+  action      String
+  resource    String
+  resourceId  String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([resource, resourceId, createdAt])
+  @@index([actorUserId, createdAt])
 }
