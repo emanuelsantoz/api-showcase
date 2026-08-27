@@ -273,6 +273,17 @@ model AnonymousView {
   @@index([projectId])
 }
 
+// Visita diária única por navegador. Persiste somente o hash de um UUID
+// aleatório; não há conta, nome, e-mail nem endereço IP associado.
+model SiteVisit {
+  visitorHash String
+  day         DateTime @db.Date
+  createdAt   DateTime @default(now())
+
+  @@id([visitorHash, day])
+  @@index([day])
+}
+
 // Histórico administrativo sem copiar conteúdo, e-mails ou tokens de acesso.
 model AuditLog {
   id          String   @id @default(uuid())
