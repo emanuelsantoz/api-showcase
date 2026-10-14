@@ -16,6 +16,7 @@ import { NoOpenSemesterError, SemesterCourseConfigurationError, SemesterDeletion
 import { MediaStorageError } from './modules/storage/media.storage';
 import { MediaValidationError } from './modules/storage/media-validation';
 import { enforceRateLimit } from './modules/security/rate-limit';
+import { DirectUploadError } from './modules/storage/direct-upload.service';
 
 const app = new Hono().basePath('/api/v1');
 
@@ -60,6 +61,7 @@ app.onError((err, c) => {
     return c.json({ error: 'Media Storage Error', message: err.publicMessage }, status);
   }
   if (err instanceof MediaValidationError) return c.json({ error: 'Unprocessable Entity', message: err.message }, 422);
+  if (err instanceof DirectUploadError) return c.json({ error: 'Unprocessable Entity', message: err.message }, 422);
   if (err instanceof NoOpenSemesterError) return c.json({ error: 'Conflict', message: err.message }, 409);
   if (err instanceof z.ZodError) return c.json({ error: 'Bad Request', message: 'Dados de submissão inválidos.', details: err.issues }, 400);
   if (err instanceof SemesterCourseConfigurationError) return c.json({ error: 'Unprocessable Entity', message: err.message }, 422);

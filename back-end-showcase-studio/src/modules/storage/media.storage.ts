@@ -35,7 +35,17 @@ export function resolveStorageProvider(kind: MediaKind): StorageProvider {
   return 'CANVA' as StorageProvider;
 }
 
-function r2Config() {
+export type R2StorageConfig = {
+  bucket: string;
+  publicUrl: string;
+  client: S3Client;
+};
+
+/**
+ * Centraliza as credenciais do R2 para que os uploads diretos usem exatamente
+ * o mesmo bucket e a mesma URL pública usados pela API.
+ */
+export function getR2StorageConfig(): R2StorageConfig {
   if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_BUCKET_NAME || !env.R2_PUBLIC_URL) {
     throw new MediaStorageError(
       'R2_NOT_CONFIGURED',
@@ -58,7 +68,7 @@ export async function uploadMedia(key: string, file: UploadableMedia, provider: 
   const bytes = Buffer.from(await file.arrayBuffer());
 
   if (provider === 'CLOUDFLARE_R2') {
-    const r2 = r2Config();
+    const r2 = getR2StorageConfig();
     try {
       await r2.client.send(new PutObjectCommand({ Bucket: r2.bucket, Key: key, Body: bytes, ContentType: file.type }));
     } catch (error) {
@@ -97,7 +107,7 @@ export async function uploadMedia(key: string, file: UploadableMedia, provider: 
 export async function deleteMedia(provider: StorageProvider, keyOrUrl: string | null | undefined) {
   if (!keyOrUrl || provider === 'CANVA') return;
   if (provider === 'CLOUDFLARE_R2') {
-    const r2 = r2Config();
+    const r2 = getR2StorageConfig();
     try {
       await r2.client.send(new DeleteObjectCommand({ Bucket: r2.bucket, Key: keyOrUrl }));
     } catch (error) {
