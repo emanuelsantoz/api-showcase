@@ -4,7 +4,7 @@ API serverless para Vercel usando Hono, Prisma e PostgreSQL.
 
 ## Rotas
 
-- `GET /api/v1/projects` e `GET /api/v1/projects/:id`: projetos aprovados.
+- `GET /api/v1/projects` e `GET /api/v1/projects/:identifier`: projetos aprovados. O identificador público é o slug; UUIDs antigos continuam aceitos.
 - `POST /api/v1/projects`: requer JWT.
 - `PATCH /api/v1/projects/:id/view`: contador público de visualizações.
 - `POST /api/v1/projects/:id/like`: requer JWT e alterna o like do usuário.

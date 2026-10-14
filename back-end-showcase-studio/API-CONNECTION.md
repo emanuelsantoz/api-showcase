@@ -104,7 +104,7 @@ Guarde o token apenas no cliente e nunca o envie para o repositório.
 | `GET` | `/courses` | Não | Lista os cursos. |
 | `GET` | `/projects` | Não | Lista projetos aprovados com paginação. |
 | `GET` | `/projects/stats` | Não | Retorna projetos publicados, alunos (integrantes), visualizações e likes. |
-| `GET` | `/projects/:id` | Não | Busca um projeto aprovado. |
+| `GET` | `/projects/:identifier` | Não | Busca um projeto aprovado pelo slug público; UUIDs antigos continuam aceitos. |
 | `POST` | `/projects` | JWT | Cria um projeto para moderação. |
 | `POST` | `/projects/:id/thumbnail` | JWT + autor/moderador | Envia a miniatura como `multipart/form-data` (`file`). |
 | `POST` | `/projects/:id/presentation/canva` | JWT + autor/moderador | Salva ou substitui o link público do Canva. |

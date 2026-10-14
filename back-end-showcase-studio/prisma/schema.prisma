@@ -93,6 +93,7 @@ model Tag {
 
 model Project {
   id                       String               @id @default(uuid())
+  slug                     String               @unique
   title                    String
   shortDescription         String
   description              String               @db.Text

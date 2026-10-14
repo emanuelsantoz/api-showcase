@@ -3,6 +3,7 @@ import { ProjectStatus, StorageProvider } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { deleteMedia, resolveStorageProvider, uploadMedia, type UploadableMedia } from '../storage/media.storage';
 import { NoOpenSemesterError, SemesterCourseConfigurationError, SemesterService } from './semester.service';
+import { projectSlugBase } from '../utils/project-slug';
 
 const details = {
   course: true,
@@ -32,6 +33,21 @@ type ProjectInput = {
 export class ProjectService {
   private readonly semesters = new SemesterService();
 
+  private async createUniqueSlug(title: string) {
+    const base = projectSlugBase(title);
+    const existing = await prisma.project.findMany({
+      where: { slug: { startsWith: base } },
+      select: { slug: true },
+    });
+    const used = new Set(existing.map((project) => project.slug));
+
+    if (!used.has(base)) return base;
+
+    let sequence = 2;
+    while (used.has(`${base}-${sequence}`)) sequence += 1;
+    return `${base}-${sequence}`;
+  }
+
   async listProjects(filters: { courseId?: string; semesterId?: string; isFeatured?: boolean; page: number; limit: number }) {
     const skip = (filters.page - 1) * filters.limit;
     const where: { status: ProjectStatus; courseId?: string; semesterId?: string; isFeatured?: boolean } = { status: ProjectStatus.APPROVED };
@@ -46,8 +62,14 @@ export class ProjectService {
     return { data: projects, meta: { total, page: filters.page, limit: filters.limit, totalPages: Math.ceil(total / filters.limit) } };
   }
 
-  async getProject(id: string) {
-    return prisma.project.findFirst({ where: { id, status: ProjectStatus.APPROVED }, include: details });
+  async getProject(identifier: string) {
+    return prisma.project.findFirst({
+      where: {
+        status: ProjectStatus.APPROVED,
+        OR: [{ id: identifier }, { slug: identifier }],
+      },
+      include: details,
+    });
   }
 
   async getPublicStats() {
@@ -86,6 +108,7 @@ export class ProjectService {
     await this.semesters.assertCourseAcceptsProjects(semester.id, data.courseId, data.className, data.tags ?? []);
     return prisma.project.create({
       data: {
+        slug: await this.createUniqueSlug(data.title),
         title: data.title,
         shortDescription: data.shortDescription,
         description: data.description,
