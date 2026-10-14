@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
-const externalUrl = z.string().url().refine((value) => {
+const externalUrl = z.string().trim().max(2048).url().refine((value) => {
   try {
-    return ['http:', 'https:'].includes(new URL(value).protocol);
+    return new URL(value).protocol === 'https:';
   } catch {
     return false;
   }
-}, 'Use uma URL HTTP ou HTTPS.');
+}, 'Use uma URL HTTPS válida.');
 
 export const createProjectSchema = z.object({
   title: z.string().trim().min(1).max(100),
@@ -35,13 +35,17 @@ export const updateProjectStatusSchema = z.object({
 });
 
 export const queryProjectSchema = z.object({
-  courseId: z.string().optional(),
+  courseId: z.string().uuid().optional(),
   // IDs históricos da migration podem ser hashes estáveis; novos semestres usam UUID.
   semesterId: z.string().min(1).optional(),
-  isFeatured: z.string().optional(),
-  page: z.string().optional().default('1'),
-  limit: z.string().optional().default('12'),
+  isFeatured: z.enum(['true', 'false']).optional().transform((value) => value === undefined ? undefined : value === 'true'),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(12),
 });
+
+export const engagementSchema = z.object({
+  visitorId: z.string().uuid(),
+}).strict();
 
 export const updateProjectContentSchema = z.object({
   title: z.string().trim().min(1).max(100),

@@ -4,8 +4,10 @@ import bcrypt from 'bcryptjs';
 import { Role } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 import { requireAuth, requireAdmin } from '../auth';
+import { AuditService } from '../services/audit.service';
 
 const userRoutes = new Hono();
+const audit = new AuditService();
 const profileSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().email(),
@@ -58,6 +60,25 @@ userRoutes.post('/professors', requireAuth, requireAdmin, async (c) => {
     select: { id: true, name: true, email: true, role: true, createdAt: true },
   });
   return c.json({ data: user, message: 'Professor cadastrado. Envie as credenciais temporárias por um canal seguro.' }, 201);
+});
+
+userRoutes.delete('/professors/:id', requireAuth, requireAdmin, async (c) => {
+  const actor = (c as any).get('user') as { id: string };
+  const professorId = c.req.param('id')!;
+  if (professorId === actor.id) return c.json({ error: 'Conflict', message: 'Você não pode remover a sua própria conta.' }, 409);
+
+  const professor = await prisma.user.findUnique({ where: { id: professorId }, select: { id: true, role: true } });
+  if (!professor) return c.json({ error: 'Not Found', message: 'Professor não encontrado.' }, 404);
+  if (professor.role !== Role.COORDENADOR) return c.json({ error: 'Forbidden', message: 'Contas de administrador não podem ser removidas por esta tela.' }, 403);
+
+  await prisma.$transaction(async (tx) => {
+    // Revisões são registros operacionais ligados ao professor; removê-las evita
+    // que a relação restritiva bloqueie a exclusão da conta desativada.
+    await tx.projectReview.deleteMany({ where: { reviewerId: professor.id } });
+    await tx.user.delete({ where: { id: professor.id } });
+  });
+  await audit.record({ actorUserId: actor.id, action: 'professor.deleted', resource: 'user', resourceId: professor.id, metadata: { role: professor.role } });
+  return c.json({ message: 'Professor removido.' }, 200);
 });
 
 export { userRoutes };

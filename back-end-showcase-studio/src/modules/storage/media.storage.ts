@@ -1,4 +1,3 @@
-import { del, put } from '@vercel/blob';
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { env } from '../../config/env';
 import type { StorageProvider } from '@prisma/client';
@@ -20,7 +19,7 @@ export type MediaKind = 'THUMBNAIL' | 'PRESENTATION_PDF' | 'CONTRIBUTOR_AVATAR' 
 /** Erro operacional de armazenamento sem expor credenciais ou detalhes do SDK ao cliente. */
 export class MediaStorageError extends Error {
   constructor(
-    public readonly code: 'R2_NOT_CONFIGURED' | 'R2_UPLOAD_FAILED' | 'R2_DELETE_FAILED' | 'BLOB_UPLOAD_FAILED',
+    public readonly code: 'R2_NOT_CONFIGURED' | 'R2_UPLOAD_FAILED' | 'R2_DELETE_FAILED' | 'UNSUPPORTED_STORAGE_PROVIDER',
     message: string,
     public readonly publicMessage: string,
   ) {
@@ -30,8 +29,7 @@ export class MediaStorageError extends Error {
 }
 
 export function resolveStorageProvider(kind: MediaKind): StorageProvider {
-  if (kind === 'THUMBNAIL' || kind === 'CONTRIBUTOR_AVATAR') return 'CLOUDFLARE_R2' as StorageProvider;
-  if (kind === 'PRESENTATION_PDF') return 'VERCEL_BLOB' as StorageProvider;
+  if (kind !== 'CANVA') return 'CLOUDFLARE_R2' as StorageProvider;
   return 'CANVA' as StorageProvider;
 }
 
@@ -76,22 +74,11 @@ export async function uploadMedia(key: string, file: UploadableMedia, provider: 
     return { url: `${r2.publicUrl}/${key.split('/').map(encodeURIComponent).join('/')}`, key, provider };
   }
 
-  let blob;
-  try {
-    blob = await put(key, bytes, { access: 'public', contentType: file.type, addRandomSuffix: false, allowOverwrite: true });
-  } catch (error) {
-    console.error('[MediaStorage] Vercel Blob upload failed', {
-      key,
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
-    throw new MediaStorageError(
-      'BLOB_UPLOAD_FAILED',
-      error instanceof Error ? error.message : String(error),
-      'Não foi possível salvar o arquivo no Vercel Blob. Verifique a configuração do armazenamento e tente novamente.',
-    );
-  }
-  return { url: blob.url, key, provider: 'VERCEL_BLOB' };
+  throw new MediaStorageError(
+    'UNSUPPORTED_STORAGE_PROVIDER',
+    `Unsupported storage provider: ${provider}`,
+    'O provedor de armazenamento solicitado não é suportado.',
+  );
 }
 
 export async function deleteMedia(provider: StorageProvider, keyOrUrl: string | null | undefined) {
@@ -114,5 +101,9 @@ export async function deleteMedia(provider: StorageProvider, keyOrUrl: string | 
     }
     return;
   }
-  await del(keyOrUrl);
+  throw new MediaStorageError(
+    'UNSUPPORTED_STORAGE_PROVIDER',
+    `Unsupported storage provider: ${provider}`,
+    'O provedor de armazenamento solicitado não é suportado.',
+  );
 }

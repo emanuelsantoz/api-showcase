@@ -4,9 +4,11 @@ import { SubmissionOrchestrator, type PublicSubmissionInput } from '../orchestra
 import { AccessTokenService } from '../services/access-token.service';
 import { publicResubmissionSchema, publicSubmissionSchema } from '../schemas/submission.schema';
 import type { UploadableMedia } from '../storage/media.storage';
+import { assertImageSignature, assertPdfSignature } from '../storage/media-validation';
 
 const orchestrator = new SubmissionOrchestrator();
 const accessTokens = new AccessTokenService();
+const MAX_TOTAL_SUBMISSION_MEDIA_BYTES = 20 * 1024 * 1024;
 type PublicMetadata = Omit<PublicSubmissionInput, 'thumbnail' | 'presentation'>;
 type ResubmissionMetadata = Omit<PublicMetadata, 'courseId' | 'className' | 'membersIds' | 'submitterName' | 'submitterEmail'>;
 
@@ -51,20 +53,23 @@ async function parseSubmissionBody(body: Record<string, unknown>): Promise<Publi
     ...contributor,
     avatarFile: getOptionalFile(body[`contributorAvatar_${index}`]),
   }));
-  contributors.forEach(({ avatarFile }) => { if (avatarFile) validateAvatar(avatarFile); });
+  await Promise.all(contributors.map(({ avatarFile }) => avatarFile ? validateAvatar(avatarFile) : undefined));
   const submitterAvatarFile = getOptionalFile(body.submitterAvatar);
-  if (submitterAvatarFile) validateAvatar(submitterAvatarFile);
+  if (submitterAvatarFile) await validateAvatar(submitterAvatarFile);
   const thumbnail = getFile(body.thumbnail);
-  validateThumbnail(thumbnail);
-  const presentation = parsePresentation(body);
+  await validateThumbnail(thumbnail);
+  const presentation = await parsePresentation(body);
+  assertTotalMediaSize([thumbnail, submitterAvatarFile, ...contributors.map((contributor) => contributor.avatarFile), presentation.type === 'PDF' ? presentation.file : undefined]);
   return { ...metadata, contributors, submitterAvatarFile, thumbnail, presentation };
 }
 
 async function parseResubmissionBody(body: Record<string, unknown>): Promise<Omit<PublicSubmissionInput, 'courseId' | 'className' | 'membersIds' | 'submitterName' | 'submitterEmail'>> {
   const metadata = parseMetadata(body, false);
   const thumbnail = getFile(body.thumbnail);
-  validateThumbnail(thumbnail);
-  return { ...metadata, thumbnail, presentation: parsePresentation(body) };
+  await validateThumbnail(thumbnail);
+  const presentation = await parsePresentation(body);
+  assertTotalMediaSize([thumbnail, presentation.type === 'PDF' ? presentation.file : undefined]);
+  return { ...metadata, thumbnail, presentation };
 }
 
 function parseMetadata(body: Record<string, unknown>, identity: true): PublicMetadata;
@@ -111,7 +116,7 @@ function parseMetadata(body: Record<string, unknown>, identity: boolean): Public
   };
 }
 
-function parsePresentation(body: Record<string, unknown>): PublicSubmissionInput['presentation'] {
+async function parsePresentation(body: Record<string, unknown>): Promise<PublicSubmissionInput['presentation']> {
   if (body.presentationType === 'CANVA') {
     const url = String(body.canvaUrl ?? '');
     if (!/^https?:\/\/(www\.)?canva\.com\/design\/.+\/view/i.test(url)) throw new Error('URL pública do Canva inválida.');
@@ -125,6 +130,7 @@ function parsePresentation(body: Record<string, unknown>): PublicSubmissionInput
   const file = getFile(body.presentation);
   if (file.type !== 'application/pdf') throw new Error('A apresentação deve ser um PDF.');
   if (file.size > 10 * 1024 * 1024) throw new Error('O PDF deve ter no máximo 10 MB.');
+  await assertPdfSignature(file);
   return { type: 'PDF', file };
 }
 
@@ -140,14 +146,16 @@ function getOptionalFile(value: unknown) {
   return value as UploadableMedia;
 }
 
-function validateThumbnail(file: UploadableMedia) {
+async function validateThumbnail(file: UploadableMedia) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('A thumbnail deve ser JPEG, PNG ou WEBP.');
   if (file.size > 2 * 1024 * 1024) throw new Error('A thumbnail deve ter no máximo 2 MB.');
+  await assertImageSignature(file);
 }
 
-function validateAvatar(file: UploadableMedia) {
+async function validateAvatar(file: UploadableMedia) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('A foto do integrante deve ser JPEG, PNG ou WEBP.');
   if (file.size > 2 * 1024 * 1024) throw new Error('A foto do integrante deve ter no mÃ¡ximo 2 MB.');
+  await assertImageSignature(file);
 }
 
 function parseJson(value: string, fallback: unknown) {
@@ -157,4 +165,11 @@ function parseJson(value: string, fallback: unknown) {
 function optionalString(value: unknown) {
   const stringValue = typeof value === 'string' ? value.trim() : '';
   return stringValue || undefined;
+}
+
+function assertTotalMediaSize(files: Array<UploadableMedia | undefined>) {
+  const total = files.reduce((sum, file) => sum + (file?.size ?? 0), 0);
+  if (total > MAX_TOTAL_SUBMISSION_MEDIA_BYTES) {
+    throw new Error('O total de arquivos da submissão deve ter no máximo 20 MB.');
+  }
 }

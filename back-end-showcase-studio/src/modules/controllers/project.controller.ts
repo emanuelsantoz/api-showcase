@@ -1,8 +1,11 @@
 import { Context } from 'hono';
 import { ProjectService } from '../services/project.service';
 import type { UploadableMedia } from '../storage/media.storage';
+import { assertImageSignature, assertPdfSignature } from '../storage/media-validation';
+import { AuditService } from '../services/audit.service';
 
 const projectService = new ProjectService();
+const audit = new AuditService();
 
 export class ProjectController {
   constructor() {
@@ -16,13 +19,15 @@ export class ProjectController {
   }
 
   async getAll(c: Context) {
+    // A rota já passou pelo zValidator; a leitura abaixo preserva a tipagem
+    // simples do Context compartilhado pelos handlers do Hono.
     const query = c.req.query();
     const result = await projectService.listProjects({
       courseId: query.courseId,
       semesterId: query.semesterId,
-      isFeatured: query.isFeatured ? query.isFeatured === 'true' : undefined,
-      page: parseInt(query.page || '1', 10),
-      limit: parseInt(query.limit || '12', 10),
+      isFeatured: query.isFeatured === undefined ? undefined : query.isFeatured === 'true',
+      page: Number(query.page ?? '1'),
+      limit: Number(query.limit ?? '12'),
     });
     return c.json(result, 200);
   }
@@ -45,17 +50,15 @@ export class ProjectController {
   }
 
   async incrementViews(c: Context) {
-    const result = await projectService.incrementViews(c.req.param('id')!);
+    const { visitorId } = await c.req.json<{ visitorId: string }>();
+    const result = await projectService.incrementViews(c.req.param('id')!, visitorId);
     if (!result) return c.json({ error: 'Not Found', message: 'Projeto não encontrado.' }, 404);
     return c.json({ data: result }, 200);
   }
 
   async handleLike(c: Context) {
-    const body = await c.req.json<{ visitorId?: string }>();
-    if (!body.visitorId || body.visitorId.length < 16 || body.visitorId.length > 200) {
-      return c.json({ error: 'Bad Request', message: 'Identificador de visitante inválido.' }, 400);
-    }
-    const result = await projectService.toggleAnonymousLike(c.req.param('id')!, body.visitorId);
+    const { visitorId } = await c.req.json<{ visitorId: string }>();
+    const result = await projectService.toggleAnonymousLike(c.req.param('id')!, visitorId);
     if (!result) return c.json({ error: 'Not Found', message: 'Projeto não encontrado.' }, 404);
     return c.json({ data: result }, 200);
   }
@@ -63,18 +66,27 @@ export class ProjectController {
   async moderate(c: Context) {
     const body = await c.req.json<{ status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'PENDING_REVIEW' | 'DRAFT'; isFeatured?: boolean }>();
     const updated = await projectService.updateStatus(c.req.param('id')!, body.status, body.isFeatured);
+    const user = c.get('user') as { id: string };
+    await audit.record({ actorUserId: user.id, action: 'project.status_updated', resource: 'project', resourceId: updated.id, metadata: { status: body.status, ...(body.isFeatured !== undefined ? { isFeatured: body.isFeatured } : {}) } });
     return c.json({ message: 'Status de moderação atualizado.', updated }, 200);
   }
 
   async remove(c: Context) {
-    const deleted = await projectService.delete(c.req.param('id')!);
+    const projectId = c.req.param('id')!;
+    const deleted = await projectService.delete(projectId);
     if (!deleted) return c.json({ error: 'Not Found', message: 'Projeto não encontrado.' }, 404);
+    const user = c.get('user') as { id: string };
+    await audit.record({ actorUserId: user.id, action: 'project.deleted', resource: 'project', resourceId: projectId });
     return c.json({ message: 'Projeto excluído.' }, 200);
   }
 
   async updateContent(c: Context) {
     if (!(await this.canManage(c))) return c.json({ error: 'Forbidden', message: 'You cannot edit this project.' }, 403);
     const updated = await projectService.updateContent(c.req.param('id')!, await c.req.json());
+    if (updated) {
+      const user = c.get('user') as { id: string };
+      await audit.record({ actorUserId: user.id, action: 'project.content_updated', resource: 'project', resourceId: updated.id });
+    }
     return c.json({ data: updated, message: 'Conteúdo do projeto atualizado.' }, 200);
   }
 
@@ -98,6 +110,7 @@ export class ProjectController {
     const mediaFile = file as UploadableMedia;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(mediaFile.type)) return c.json({ error: 'Unprocessable Entity', message: 'Thumbnail must be JPEG, PNG or WebP.' }, 422);
     if (mediaFile.size > 2 * 1024 * 1024) return c.json({ error: 'Unprocessable Entity', message: 'Thumbnail must be smaller than 2 MB.' }, 422);
+    await assertImageSignature(mediaFile);
     const project = await projectService.uploadThumbnail(c.req.param('id')!, mediaFile);
     return c.json({ data: project }, 200);
   }
@@ -110,6 +123,7 @@ export class ProjectController {
     const mediaFile = file as UploadableMedia;
     if (mediaFile.type !== 'application/pdf') return c.json({ error: 'Unprocessable Entity', message: 'Presentation must be a PDF.' }, 422);
     if (mediaFile.size > 10 * 1024 * 1024) return c.json({ error: 'Unprocessable Entity', message: 'PDF must be smaller than 10 MB.' }, 422);
+    await assertPdfSignature(mediaFile);
     const presentation = await projectService.uploadPdf(c.req.param('id')!, mediaFile);
     return c.json({ data: presentation }, 200);
   }

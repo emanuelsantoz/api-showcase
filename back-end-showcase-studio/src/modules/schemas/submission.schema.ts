@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const externalUrl = z.string().url().refine((value) => ['http:', 'https:'].includes(new URL(value).protocol), 'Use uma URL HTTP ou HTTPS.');
+const externalUrl = z.string().trim().max(2048).url().refine((value) => new URL(value).protocol === 'https:', 'Use uma URL HTTPS válida.');
 const tagsSchema = z.array(z.string().trim().min(1).max(40)).max(20).default([]);
 const contributorSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -26,9 +26,9 @@ export const publicSubmissionSchema = z.object({
   prototypeUrl: externalUrl.optional(),
   repositoryUrl: externalUrl.optional(),
   presentationType: z.enum(['PDF', 'CANVA', 'POWERPOINT']),
-  canvaUrl: z.string().url().optional(),
-  powerpointUrl: z.string().url().optional(),
-});
+  canvaUrl: z.string().trim().max(2048).url().optional(),
+  powerpointUrl: z.string().trim().max(2048).url().optional(),
+}).strict();
 
 export const publicResubmissionSchema = publicSubmissionSchema.omit({
   courseId: true,
