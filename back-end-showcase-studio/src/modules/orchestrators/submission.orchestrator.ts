@@ -4,6 +4,7 @@ import { ProjectStatus, StorageProvider } from '@prisma/client';
 import { deleteMedia, resolveStorageProvider, uploadMedia, type UploadableMedia } from '../storage/media.storage';
 import { AccessTokenService } from '../services/access-token.service';
 import { NoOpenSemesterError, SemesterService } from '../services/semester.service';
+import type { VerifiedDirectUpload } from '../storage/direct-upload.service';
 
 const details = {
   course: true,
@@ -41,6 +42,21 @@ export type PublicSubmissionInput = {
     type: 'POWERPOINT';
     url: string;
   };
+};
+
+/** Dados já enviados e validados no R2. Nenhum binário atravessa a Function. */
+export type DirectPublicSubmissionInput = Omit<PublicSubmissionInput, 'thumbnail' | 'presentation' | 'submitterAvatarFile' | 'contributors'> & {
+  thumbnail: VerifiedDirectUpload;
+  submitterAvatar?: VerifiedDirectUpload;
+  contributors: Array<{
+    name: string;
+    email?: string;
+    roleInfo?: string;
+    avatarIndex?: number;
+    avatarColor?: string;
+    avatar?: VerifiedDirectUpload;
+  }>;
+  presentation: { type: 'PDF'; file: VerifiedDirectUpload } | { type: 'CANVA' | 'POWERPOINT'; url: string };
 };
 
 function thumbnailObjectKey(projectId: string, mimeType: string) {
@@ -129,6 +145,77 @@ export class SubmissionOrchestrator {
       if (projectId) await prisma.project.delete({ where: { id: projectId } }).catch(() => undefined);
       throw error;
     }
+  }
+
+  /**
+   * Persiste uma submissão cujos arquivos já foram enviados diretamente ao R2.
+   * Mantém a Function pequena e evita que uploads multipart sejam bloqueados
+   * antes de chegar à API.
+   */
+  async submitDirect(input: DirectPublicSubmissionInput) {
+    const semester = await this.semesters.getCurrent();
+    if (!semester) throw new NoOpenSemesterError();
+    await this.semesters.assertCourseAcceptsProjects(semester.id, input.courseId, input.className, input.tags);
+
+    const project = await prisma.project.create({
+      data: {
+        title: input.title,
+        shortDescription: input.shortDescription,
+        description: input.description,
+        courseId: input.courseId,
+        className: input.className,
+        semesterId: semester.id,
+        submitterName: input.submitterName,
+        submitterEmail: input.submitterEmail,
+        submitterAvatarUrl: input.submitterAvatar?.url,
+        submitterAvatarColor: input.submitterAvatarColor,
+        status: ProjectStatus.PENDING_REVIEW,
+        tags: input.tags,
+        liveUrl: input.liveUrl,
+        prototypeUrl: input.prototypeUrl,
+        repositoryUrl: input.repositoryUrl,
+        thumbnailUrl: input.thumbnail.url,
+        thumbnailStorageProvider: StorageProvider.CLOUDFLARE_R2,
+        thumbnailStorageKey: input.thumbnail.key,
+        ...(input.membersIds.length > 0 ? { members: { create: input.membersIds.map((userId) => ({ userId, roleInfo: 'Contributor' })) } } : {}),
+        ...(input.contributors.length > 0 ? {
+          contributors: {
+            create: input.contributors.map(({ name, email, roleInfo, avatar, avatarColor }) => ({
+              name,
+              email,
+              roleInfo,
+              avatarUrl: avatar?.url,
+              avatarColor,
+            })),
+          },
+        } : {}),
+        ...(input.presentation.type === 'PDF'
+          ? {
+            presentation: {
+              create: {
+                type: 'PDF',
+                url: input.presentation.file.url,
+                storageProvider: StorageProvider.CLOUDFLARE_R2,
+                storageKey: input.presentation.file.key,
+                contentType: input.presentation.file.contentType,
+                sizeBytes: input.presentation.file.sizeBytes,
+              },
+            },
+          }
+          : {
+            presentation: {
+              create: {
+                type: input.presentation.type,
+                url: input.presentation.url,
+                storageProvider: StorageProvider.CANVA,
+              },
+            },
+          }),
+      },
+      include: details,
+    });
+    const access = await this.accessTokens.create(project.id);
+    return { project, accessToken: access.token, accessExpiresAt: access.expiresAt };
   }
 
   async resubmit(projectId: string, input: Omit<PublicSubmissionInput, 'courseId' | 'className' | 'membersIds' | 'submitterName' | 'submitterEmail'>, accessToken: string) {

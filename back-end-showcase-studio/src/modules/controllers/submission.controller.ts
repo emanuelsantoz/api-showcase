@@ -1,23 +1,52 @@
 import type { Context } from 'hono';
+import crypto from 'node:crypto';
 import { z } from 'zod';
-import { SubmissionOrchestrator, type PublicSubmissionInput } from '../orchestrators/submission.orchestrator';
+import { SubmissionOrchestrator, type DirectPublicSubmissionInput, type PublicSubmissionInput } from '../orchestrators/submission.orchestrator';
 import { AccessTokenService } from '../services/access-token.service';
 import { publicResubmissionSchema, publicSubmissionSchema } from '../schemas/submission.schema';
 import type { UploadableMedia } from '../storage/media.storage';
 import { assertImageSignature, assertPdfSignature } from '../storage/media-validation';
+import { DirectUploadService, type DirectUploadKind, type DirectUploadReference } from '../storage/direct-upload.service';
+import { AuditService } from '../services/audit.service';
 
 const orchestrator = new SubmissionOrchestrator();
 const accessTokens = new AccessTokenService();
+const directUploads = new DirectUploadService();
+const audit = new AuditService();
 const MAX_TOTAL_SUBMISSION_MEDIA_BYTES = 20 * 1024 * 1024;
 type PublicMetadata = Omit<PublicSubmissionInput, 'thumbnail' | 'presentation'>;
 type ResubmissionMetadata = Omit<PublicMetadata, 'courseId' | 'className' | 'membersIds' | 'submitterName' | 'submitterEmail'>;
 
 export class SubmissionController {
   async create(c: Context) {
+    if (c.req.header('content-type')?.includes('application/json')) {
+      const input = await parseDirectSubmissionBody(await c.req.json<Record<string, unknown>>());
+      const result = await orchestrator.submitDirect(input);
+      await audit.record({ action: 'public-submission-created', resource: 'project', resourceId: result.project.id, metadata: { uploadFlow: 'direct-r2' } })
+        .catch((error) => console.error('[Audit] public submission record failed', { error: error instanceof Error ? error.message : String(error) }));
+      console.info('[PublicSubmission] persisted direct upload submission', { projectId: result.project.id });
+      return c.json({ data: result.project, accessToken: result.accessToken, accessExpiresAt: result.accessExpiresAt }, 201);
+    }
     const body = await c.req.parseBody();
     const input = await parseSubmissionBody(body as Record<string, unknown>);
     const result = await orchestrator.submit(input);
+    console.info('[PublicSubmission] persisted multipart submission', { projectId: result.project.id });
     return c.json({ data: result.project, accessToken: result.accessToken, accessExpiresAt: result.accessExpiresAt }, 201);
+  }
+
+  async authorizeUploads(c: Context) {
+    const body = await c.req.json<{ files?: Array<{ id?: unknown; kind?: unknown; contentType?: unknown; size?: unknown }> }>();
+    const files = (body.files ?? []).map((file) => ({
+      id: typeof file.id === 'string' ? file.id : '',
+      kind: file.kind as DirectUploadKind,
+      contentType: typeof file.contentType === 'string' ? file.contentType : '',
+      size: typeof file.size === 'number' ? file.size : NaN,
+    }));
+    const uploads = await directUploads.authorize(files);
+    await audit.record({ action: 'public-upload-authorized', resource: 'media-upload', resourceId: crypto.randomUUID(), metadata: { count: uploads.length } })
+      .catch((error) => console.error('[Audit] upload authorization record failed', { error: error instanceof Error ? error.message : String(error) }));
+    console.info('[PublicSubmission] authorized direct uploads', { count: uploads.length });
+    return c.json({ data: { uploads } }, 201);
   }
 
   async access(c: Context) {
@@ -45,6 +74,44 @@ export class SubmissionController {
     const project = await orchestrator.resubmit(access.projectId, await parseResubmissionBody(await c.req.parseBody() as Record<string, unknown>), access.token);
     return c.json({ data: project, message: 'Projeto reenviado para validação.' }, 200);
   }
+}
+
+async function parseDirectSubmissionBody(body: Record<string, unknown>): Promise<DirectPublicSubmissionInput> {
+  const metadata = parseMetadata(body, true);
+  const thumbnail = await verifyUpload(body.thumbnailUpload, 'THUMBNAIL');
+  const submitterAvatar = body.submitterAvatarUpload ? await verifyUpload(body.submitterAvatarUpload, 'SUBMITTER_AVATAR') : undefined;
+  const rawContributors = Array.isArray(body.contributors) ? body.contributors : [];
+  const contributors = await Promise.all(metadata.contributors.map(async (contributor, index) => {
+    const raw = rawContributors[index];
+    const avatarUpload = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).avatarUpload : undefined;
+    return {
+      ...contributor,
+      avatar: avatarUpload ? await verifyUpload(avatarUpload, 'CONTRIBUTOR_AVATAR') : undefined,
+    };
+  }));
+  const presentation = await parseDirectPresentation(body);
+  return { ...metadata, thumbnail, submitterAvatar, contributors, presentation };
+}
+
+async function parseDirectPresentation(body: Record<string, unknown>): Promise<DirectPublicSubmissionInput['presentation']> {
+  if (body.presentationType === 'PDF') return { type: 'PDF', file: await verifyUpload(body.presentationUpload, 'PRESENTATION_PDF') };
+  if (body.presentationType === 'CANVA') {
+    const url = String(body.canvaUrl ?? '');
+    if (!/^https?:\/\/(www\.)?canva\.com\/design\/.+\/view/i.test(url)) throw new Error('URL pública do Canva inválida.');
+    return { type: 'CANVA', url };
+  }
+  if (body.presentationType === 'POWERPOINT') {
+    const url = String(body.powerpointUrl ?? '');
+    if (!/^https?:\/\/(www\.)?1drv\.ms\/p\/.+/i.test(url)) throw new Error('URL de incorporação do PowerPoint inválida.');
+    return { type: 'POWERPOINT', url };
+  }
+  throw new Error('Tipo de apresentação inválido.');
+}
+
+async function verifyUpload(value: unknown, kind: DirectUploadKind) {
+  if (!value || typeof value !== 'object') throw new Error('Arquivo obrigatório não enviado.');
+  const reference = value as DirectUploadReference;
+  return directUploads.verify(reference, kind);
 }
 
 async function parseSubmissionBody(body: Record<string, unknown>): Promise<PublicSubmissionInput> {
