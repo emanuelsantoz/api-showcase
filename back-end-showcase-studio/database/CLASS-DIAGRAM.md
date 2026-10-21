@@ -4,6 +4,28 @@
 classDiagram
   direction LR
 
+  class InstitutionType {
+    +String id PK
+    +String name UK
+    +String slug UK
+  }
+
+  class Institution {
+    +String id PK
+    +String name
+    +String slug UK
+    +String institutionTypeId FK
+    +String? logoUrl
+    +String? websiteUrl
+    +Boolean active
+  }
+
+  class InstitutionMembership {
+    +String institutionId PK, FK
+    +String userId PK, FK
+    +InstitutionRole role
+    +Boolean active
+  }
   class ProjectStatus {
     <<enumeration>>
     DRAFT
@@ -33,7 +55,7 @@ classDiagram
     REJECTED
   }
 
-  class SemesterStatus {
+  class SubmissionContextStatus {
     <<enumeration>>
     DRAFT
     OPEN
@@ -41,11 +63,31 @@ classDiagram
     ARCHIVED
   }
 
+  class PlatformRole {
+    <<enumeration>>
+    USER
+    PLATFORM_ADMIN
+  }
+
+  class InstitutionRole {
+    <<enumeration>>
+    INSTITUTION_ADMIN
+    COORDINATOR
+    PROFESSOR
+  }
+
+  class SubmissionScope {
+    <<enumeration>>
+    INSTITUTION
+    COURSE
+    DISCIPLINE
+  }
+
   class User {
     +String id PK
     +String name
     +String email UK
-    +Role role
+    +PlatformRole platformRole
   }
 
   class Project {
@@ -54,8 +96,7 @@ classDiagram
     +String? submitterName
     +String? submitterEmail
     +Int revision
-    +String semesterId FK
-    +String className
+    +String submissionContextId FK
     +String[] tags
     +String? liveUrl
     +String? prototypeUrl
@@ -66,28 +107,50 @@ classDiagram
     +String? thumbnailStorageKey
   }
 
-  class Semester {
+  class AcademicPeriod {
     +String id PK
-    +Int year
-    +Int number
-    +String code UK
+    +String institutionId FK
+    +String code
     +String label
-    +DateTime startsAt
-    +DateTime endsAt
-    +SemesterStatus status
+    +DateTime? startsAt
+    +DateTime? endsAt
   }
 
   class Course {
     +String id PK
-    +String name UK
+    +String institutionId FK
+    +String name
     +String? description
   }
 
-  class SemesterCourse {
-    +String semesterId PK, FK
+  class Discipline {
+    +String id PK
+    +String institutionId FK
+    +String name
+    +String? code
+    +String? description
+  }
+
+  class CourseDiscipline {
     +String courseId PK, FK
-    +String className PK
+    +String disciplineId PK, FK
+    +Int? recommendedPeriod
+    +Boolean required
+  }
+
+  class SubmissionContext {
+    +String id PK
+    +String institutionId FK
+    +String? academicPeriodId FK
+    +String? courseId FK
+    +String? disciplineId FK
+    +SubmissionScope scope
+    +SubmissionContextStatus status
+    +String name
+    +String? className
     +String? theme
+    +DateTime? submissionsOpenAt
+    +DateTime? submissionsCloseAt
   }
 
   class Tag {
@@ -95,10 +158,8 @@ classDiagram
     +String name UK
   }
 
-  class SemesterCourseTag {
-    +String semesterId PK, FK
-    +String courseId PK, FK
-    +String className PK, FK
+  class SubmissionContextTag {
+    +String submissionContextId PK, FK
     +String tagId PK, FK
   }
 
@@ -139,22 +200,34 @@ classDiagram
   }
 
   User "1" <-- "0..*" ProjectReview : reviewer
+  InstitutionType "1" --> "0..*" Institution : classifies
+  Institution "1" *-- "0..*" InstitutionMembership : has members
+  User "1" *-- "0..*" InstitutionMembership : participates in
+  Institution "1" --> "0..*" Course : offers
+  Institution "1" --> "0..*" Discipline : registers
+  Institution "1" --> "0..*" AcademicPeriod : organizes
+  Institution "1" --> "0..*" SubmissionContext : configures
   Project "1" *-- "0..1" ProjectPresentation : presentation
   Project "1" *-- "0..*" ProjectContributor : public contributors
   Project "1" *-- "0..*" ProjectReview : reviews
   Project "1" *-- "0..*" ProjectAccessToken : edit tokens
-  Semester "1" --> "0..*" Project : contains
-  Semester "1" *-- "0..*" SemesterCourse : enabled disciplines
-  Course "1" *-- "0..*" SemesterCourse : offered in
-  SemesterCourse "1" *-- "0..*" SemesterCourseTag : classified by
-  Tag "1" *-- "0..*" SemesterCourseTag : reusable tag
-  Course "1" --> "0..*" Project : categorizes
+  SubmissionContext "1" --> "0..*" Project : receives
+  Course "1" *-- "0..*" CourseDiscipline : curriculum
+  Discipline "1" *-- "0..*" CourseDiscipline : used by courses
+  AcademicPeriod "0..1" <-- "0..*" SubmissionContext : scheduled in
+  Course "0..1" <-- "0..*" SubmissionContext : scoped to
+  Discipline "0..1" <-- "0..*" SubmissionContext : scoped to
+  SubmissionContext "1" *-- "0..*" SubmissionContextTag : classified by
+  Tag "1" *-- "0..*" SubmissionContextTag : reusable tag
   ProjectStatus <.. Project : status
   PresentationType <.. ProjectPresentation : type
   StorageProvider <.. Project : thumbnail provider
   StorageProvider <.. ProjectPresentation : file provider
   ReviewDecision <.. ProjectReview : decision
-  SemesterStatus <.. Semester : status
+  PlatformRole <.. User : platform role
+  InstitutionRole <.. InstitutionMembership : institution role
+  SubmissionContextStatus <.. SubmissionContext : status
+  SubmissionScope <.. SubmissionContext : scope
 ```
 
 ## Regras do fluxo
@@ -166,6 +239,14 @@ classDiagram
 - Ao reenviar, o token anterior é invalidado.
 - A aprovação ou rejeição definitiva invalida tokens pendentes.
 - O arquivo físico fica no provider indicado em `storageProvider`; o Neon guarda apenas URL e metadados.
-- O semestre representa somente o período; cada `SemesterCourse` define o tema da disciplina/turma naquele período.
-- A chave de `SemesterCourse` permite o mesmo curso várias vezes no semestre, desde que a turma seja diferente.
-- Cada projeto pertence a uma única turma por meio de `courseId + className`.
+- Cada projeto pertence obrigatoriamente a um `SubmissionContext`; a instituição é determinada por esse contexto.
+- Um usuário pode participar de várias instituições por meio de `InstitutionMembership`, com papel e ativação próprios em cada uma.
+- Cursos, disciplinas e períodos acadêmicos são cadastros próprios da instituição; seus nomes e códigos são únicos apenas dentro dela.
+- `CourseDiscipline` descreve a grade curricular, mas não é obrigatório para instituições que não organizam trabalhos por curso e disciplina.
+- `SubmissionContext` pode ter escopo institucional, de curso ou de disciplina e concentra turma, tema e janela de recebimento.
+- O status de `SubmissionContext` controla se aquele contexto está recebendo projetos; o período acadêmico é apenas uma referência temporal opcional.
+- No escopo `INSTITUTION`, `courseId` e `disciplineId` ficam vazios.
+- No escopo `COURSE`, `courseId` é obrigatório e `disciplineId` fica vazio.
+- No escopo `DISCIPLINE`, `disciplineId` é obrigatório; `courseId` é opcional quando a disciplina é compartilhada por vários cursos.
+- O período acadêmico é opcional para permitir mostras contínuas, anuais ou sem divisão por semestre.
+- Quando curso, disciplina ou período forem informados, todos devem pertencer à mesma instituição do `SubmissionContext`.

@@ -19,6 +19,9 @@ const details = {
 // entre a curadoria e o portfólio público.
 const publicProjectSelect = {
   id: true,
+  // O slug é o identificador canônico da URL pública. Sem ele o frontend
+  // precisa cair no UUID e não consegue preservar links legíveis.
+  slug: true,
   title: true,
   shortDescription: true,
   description: true,
